@@ -75,6 +75,10 @@ export default function App() {
   const [myPrivate, setMyPrivate] = useState(null);
   const [myProxy, setMyProxy] = useState(null);
   const [bidMode, setBidMode] = useState("automatic");
+  const [showMatch, setShowMatch] = useState(false);
+  const [homeTactic, setHomeTactic] = useState("equilibrado");
+  const [awayTactic, setAwayTactic] = useState("equilibrado");
+  const [matchResult, setMatchResult] = useState(null);
 
   const participant = useMemo(() => participants.find(p => p.id === profile?.participant_id), [participants, profile]);
   const isHost = participant?.is_host === true;
@@ -86,6 +90,35 @@ export default function App() {
   const mySpent = Number(participant?.spent || 0);
   const myBalance = Math.max(0, Number(participant?.budget || 0) - mySpent);
   const rosterCounts = useMemo(() => participants.map(p => ({...p, rosterCount: roster.filter(r => r.participant_id === p.id).length, balance: Math.max(0, Number(p.budget || 0) - Number(p.spent || 0))})), [participants, roster]);
+  const matchReady = participants.length === 2 && participants.every(p => roster.filter(r => r.participant_id === p.id).length === 23);
+  const tactics = { equilibrado:{label:"Equilibrado",attack:0,defense:0}, ofensivo:{label:"Ofensivo",attack:7,defense:-4}, defensivo:{label:"Defensivo",attack:-3,defense:7}, contra:{label:"Contra-ataque",attack:4,defense:2}, posse:{label:"Posse de bola",attack:3,defense:1} };
+  function buildStartingEleven(teamRoster) {
+    const needs = [["Goleiro",1],["Lateral-direito",1],["Zagueiro",2],["Lateral-esquerdo",1],["Volante",1],["Meio-campo",3],["Atacante",2]];
+    const used = new Set(); const starters = [];
+    for (const [position,count] of needs) {
+      const candidates = teamRoster.filter(p=>p.position===position && !used.has(p.id)).sort((x,y)=>Number(y.rating||75)-Number(x.rating||75));
+      for (const player of candidates.slice(0,count)) { used.add(player.id); starters.push(player); }
+    }
+    return {starters,bench:teamRoster.filter(p=>!used.has(p.id))};
+  }
+  function simulateMatch() {
+    const teams = participants.map(p => ({participant:p,...buildStartingEleven(roster.filter(r=>r.participant_id===p.id))}));
+    if (teams.some(t=>t.starters.length!==11)) { setMessage("Não foi possível montar o 4-4-2. Confira as posições dos elencos."); return; }
+    const scoreTeam = (team, opponent, tacticKey, oppTacticKey) => {
+      const avg = team.starters.reduce((s,p)=>s+Number(p.rating||75),0)/11;
+      const bench = team.bench.reduce((s,p)=>s+Number(p.rating||75),0)/(team.bench.length||1);
+      const oppAvg = opponent.starters.reduce((s,p)=>s+Number(p.rating||75),0)/11;
+      const strength = avg*0.78 + bench*0.08 + 10 + tactics[tacticKey].attack - tactics[oppTacticKey].defense*0.35;
+      const expected = Math.max(0.15,Math.min(4.2,1.25+(strength-oppAvg)/22));
+      let goals=0; for(let i=0;i<6;i++) if(Math.random()<expected/6) goals++;
+      return {goals,avg:Math.round(avg),strength:Math.round(strength)};
+    };
+    const h=scoreTeam(teams[0],teams[1],homeTactic,awayTactic), v=scoreTeam(teams[1],teams[0],awayTactic,homeTactic);
+    const events=[];
+    [[teams[0],h.goals],[teams[1],v.goals]].forEach(([t,n])=>{const pool=t.starters.filter(p=>p.position==="Atacante"||p.position==="Meio-campo");for(let i=0;i<n;i++)events.push({team:t.participant.display_name,player:pool[Math.floor(Math.random()*pool.length)]?.player_name||"Gol",minute:Math.floor(Math.random()*90)+1});});
+    events.sort((x,y)=>x.minute-y.minute);
+    setMatchResult({teams,home:h,away:v,events,winner:h.goals===v.goals?"Empate":h.goals>v.goals?teams[0].participant.display_name:teams[1].participant.display_name});
+  }
   const allBudgetsExhausted = participants.length === 2 && rosterCounts.every(p => p.balance <= 0);
   const oneRosterComplete = rosterCounts.some(p => p.rosterCount >= 23);
   const completionReady = !lot && rosterCounts.some(p => p.rosterCount < 23) && (allBudgetsExhausted || oneRosterComplete);
@@ -132,7 +165,7 @@ export default function App() {
       supabase.from("rooms").select("*").eq("id", roomId).single(),
       supabase.from("participants").select("id,display_name,is_host,budget,spent,connected,created_at,club_name,club_wiki_title").eq("room_id", roomId).order("created_at"),
       supabase.from("auction_lots").select("*").eq("room_id", roomId).eq("status","open").maybeSingle(),
-      supabase.from("roster").select("id,player_name,position,winning_bid,participant_id").eq("room_id", roomId)
+      supabase.from("roster").select("id,player_name,position,winning_bid,participant_id,rating").eq("room_id", roomId)
     ]);
     if (r.error) { setMessage("Sala não encontrada ou sessão expirada."); return; }
     setRoom(r.data); setParticipants(ps.data || []); setLot(l.data || null); setRoster(rs.data || []);
@@ -377,6 +410,16 @@ export default function App() {
           </> : <div className="empty"><Trophy size={28}/><p>Quando o primeiro jogador for colocado em disputa, ele aparecerá aqui.</p></div>}
         </article>
         {isHost && <article className="panel draw-panel"><p className="eyebrow">CONTROLE DO LEILOEIRO</p><h3>{completionReady ? "Completar elenco pendente" : "Próximo lote automático"}</h3><p>{completionReady ? "Como um participante já completou 23 jogadores ou os dois saldos acabaram, os jogadores brasileiros restantes serão atribuídos aleatoriamente, sem custo, somente a quem ainda tiver vagas." : "O sistema sorteia um craque ainda não utilizado. Quem estiver sem saldo só poderá desistir do lote; quem ainda tiver saldo poderá disputar normalmente."}</p><div className="draw-note"><Trophy size={18}/><span>{rosterCounts.map(p => p.display_name + ": " + p.rosterCount + "/23").join(" • ")}</span></div>{completionReady ? <button className="primary" disabled={busy} onClick={completeRostersRandomly}><Gavel size={17}/> Completar elencos aleatoriamente</button> : <button className="primary" disabled={busy || participants.length < 2 || !!lot || allBudgetsExhausted || oneRosterComplete} onClick={openLot}><Gavel size={17}/> Sortear próximo jogador</button>}</article>}
+        {isHost && matchReady && <article className="panel draw-panel">
+          <p className="eyebrow">NOVA ETAPA • CAMPO</p><h3>Simulação de partidas</h3>
+          <p>Os dois elencos estão completos. Monte o confronto no 4-4-2 e inicie a partida.</p>
+          <button className="primary" onClick={()=>{setShowMatch(v=>!v);setMatchResult(null);}}><Trophy size={17}/> {showMatch?"Fechar simulação":"Abrir simulação"}</button>
+          {showMatch && <div className="match-setup">
+            <div className="grid-two">{participants.map((p,i)=>{const lineup=buildStartingEleven(roster.filter(r=>r.participant_id===p.id));return <div className="panel" key={p.id}><h3>{p.display_name} • 4-4-2</h3><label>Estratégia</label><select value={i===0?homeTactic:awayTactic} onChange={e=>i===0?setHomeTactic(e.target.value):setAwayTactic(e.target.value)}>{Object.entries(tactics).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}</select><b>Time titular</b>{lineup.starters.map((pl,j)=><div className="bid-row" key={pl.id}><span>{j+1}. {pl.player_name}<small>{pl.position}</small></span><b>{pl.rating||75}</b></div>)}<small>Banco: {lineup.bench.length} jogadores</small></div>})}</div>
+            <button className="primary" onClick={simulateMatch}><Trophy size={17}/> Iniciar partida</button>
+            {matchResult && <div className="panel match-result"><p className="eyebrow">APITO FINAL</p><h2>{matchResult.teams[0].participant.display_name} {matchResult.home.goals} × {matchResult.away.goals} {matchResult.teams[1].participant.display_name}</h2><h3>{matchResult.winner==="Empate"?"Empate":"Vitória de "+matchResult.winner}</h3><p>Força média: {matchResult.home.avg} × {matchResult.away.avg}</p><b>Gols e eventos</b>{matchResult.events.length?matchResult.events.map((e,i)=><div className="bid-row" key={i}><span>{e.minute}' • {e.player}<small>{e.team}</small></span><b>GOL</b></div>):<p>Partida sem gols.</p>}</div>}
+          </div>}
+        </article>}
       </div>
       <aside className="side-col">
         <article className="panel"><p className="eyebrow">PARTICIPANTES</p>{participants.map(p=><div className="person" key={p.id}><ClubBadge wiki={p.club_wiki_title} name={p.club_name}/><div className="avatar">{p.display_name.slice(0,1).toUpperCase()}</div><div className="person-info"><b>{p.display_name}</b><small>{p.club_name||"Clube não selecionado"}</small><small>{p.is_host?"Organizador":"Participante"}</small><small>Saldo: {money(Math.max(0,Number(p.budget)-Number(p.spent)))}</small><small>Elenco: {rosterCounts.find(x=>x.id===p.id)?.rosterCount || 0}/23</small>{p.id===participant?.id && <div className="my-club-editor"><select value={clubDraft} onChange={e=>setClubDraft(e.target.value)}>{SORTED_CLUBS.map(c=><option key={c.name} value={c.name}>{c.name}</option>)}</select><button className="secondary club-save" disabled={busy} onClick={saveMyClub}>Escolher meu clube</button></div>}</div><span className={`dot ${p.connected?"on":""}`}/></div>)}</article>
