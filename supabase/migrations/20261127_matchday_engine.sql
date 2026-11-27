@@ -107,12 +107,12 @@ begin
   if p_team is null or jsonb_typeof(p_team) <> 'object' then
     raise exception 'Equipe inválida.';
   end if;
-  if jsonb_typeof(p_team->'starters') <> 'array' or jsonb_typeof(p_team->'bench') <> 'array' then
+  if jsonb_typeof(p_team->'starters') is distinct from 'array' or jsonb_typeof(p_team->'bench') is distinct from 'array' then
     raise exception 'Escalação inválida.';
   end if;
   if jsonb_array_length(p_team->'starters') <> 11
-     or coalesce((p_team->>'substitutions')::integer,0) > 5
-     or coalesce((p_team->>'subWindows')::integer,0) > 3 then
+     or coalesce((p_team->>'substitutions')::integer,0) < 0 or coalesce((p_team->>'substitutions')::integer,0) > 5
+     or coalesce((p_team->>'subWindows')::integer,0) < 0 or coalesce((p_team->>'subWindows')::integer,0) > 3 then
     raise exception 'Escalação ou limite de substituições inválido.';
   end if;
 
