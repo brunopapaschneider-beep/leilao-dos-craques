@@ -93,3 +93,28 @@ button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:12
 @media(max-width:760px){.match-scoreboard{padding:13px 8px}.match-scoreboard strong{font-size:38px}.coach-grid{grid-template-columns:1fr}.substitution-row{grid-template-columns:1fr}.substitution-row>svg{justify-self:center;transform:rotate(90deg)}.match-launch{display:grid}.match-launch button{width:100%}}
 
 .match-ready-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}.match-ready-row .draw-note{margin:0}.match-ready-row button{margin:0!important;white-space:nowrap}@media(max-width:760px){.match-ready-row{grid-template-columns:1fr}.match-ready-row button{width:100%}}
+
+
+.roster-duel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:0 0 20px}
+.roster-team{min-width:0;overflow:hidden;border:1px solid color-mix(in srgb,var(--club-primary) 55%,#38516a);border-radius:18px;background:linear-gradient(155deg,color-mix(in srgb,var(--club-primary) 24%,#10283d),#091a2a 72%);box-shadow:0 14px 34px #0003}
+.roster-team-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px;background:linear-gradient(110deg,color-mix(in srgb,var(--club-primary) 72%,#071827),color-mix(in srgb,var(--club-secondary) 30%,#10283d));border-bottom:3px solid var(--club-secondary)}
+.roster-team-identity{display:flex;align-items:center;gap:12px;min-width:0}
+.roster-team-identity>div{min-width:0}
+.roster-team-identity .eyebrow{margin-bottom:3px;color:#fff9}
+.roster-team-identity h2{font:800 26px 'Barlow Condensed',sans-serif;margin:0;color:#fff;overflow-wrap:anywhere}
+.roster-team-identity span:not(.club-badge){font-size:11px;color:#fffD}
+.roster-count{font:800 30px 'Barlow Condensed',sans-serif;color:#fff;white-space:nowrap}
+.roster-count small{font:600 13px Inter,sans-serif;color:#fffd}
+.roster-finance{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:12px 14px}
+.roster-finance>div{padding:10px 12px;border:1px solid #ffffff24;border-radius:11px;background:#06152299}
+.roster-finance small{display:block;color:#c1d0dc;font-size:10px;margin-bottom:4px}
+.roster-finance b{font-size:16px;color:#fff}
+.roster-list{padding:0 14px 14px;max-height:440px;overflow:auto}
+.roster-player{display:grid;grid-template-columns:27px minmax(0,1fr) auto;gap:9px;align-items:center;padding:9px 2px;border-bottom:1px solid #ffffff18}
+.roster-number{font:700 12px 'Barlow Condensed',sans-serif;color:var(--club-secondary)}
+.roster-player-info{min-width:0}
+.roster-player-info b{display:block;font-size:12px;color:#f2f6f9;overflow-wrap:anywhere}
+.roster-player-info small{display:block;font-size:10px;color:#a9bdcd;margin-top:3px}
+.roster-player>strong{font-size:12px;color:#f0c66d;white-space:nowrap}
+.roster-empty{padding:22px 8px;color:#9fb2c2;text-align:center;font-size:12px}
+@media(max-width:760px){.roster-duel{grid-template-columns:1fr}.roster-list{max-height:340px}.roster-team-identity h2{font-size:23px}}
