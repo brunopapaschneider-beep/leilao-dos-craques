@@ -55,6 +55,7 @@ export default function MatchCenter({supabase,roomId,participant,participants,ro
  const current=roomMatch.match_state,score=current?.score||{},history=roomMatch.match_history||[];
  const series=roomMatch.match_series||current?.series||null,seriesActive=!!series?.active;
  const myTeam=current?.teams?.[participant?.id],editableTeam=outgoing||myTeam;
+ const readyMap=current?.ready||{},myReady=!!readyMap[participant?.id],otherReady=!!readyMap[participants.find(p=>p.id!==participant?.id)?.id];
  const ready=participants.length===2&&participants.every(p=>roster.filter(r=>r.participant_id===p.id).length===23);
  const wins=useMemo(()=>Object.fromEntries(participants.map(p=>[p.id,history.filter(h=>h.winner_id===p.id).length])),[history,participants]);
  const canStartBest=participants.length===2&&participants.every(p=>(wins[p.id]||0)>0);
@@ -97,6 +98,7 @@ export default function MatchCenter({supabase,roomId,participant,participants,ro
   changeMyTeam({...editableTeam,starters,bench,substitutions:editableTeam.substitutions+1,subWindows:newWindows,lastSubMinute:current.minute,subLog});
   setSubOut("");setSubIn("");
  }
+ async function toggleReady(){await callRpc('set_room_match_ready',{p_ready:!myReady});}
  async function advance(){
   if(!isHost||!current?.paused||current.status!=="live")return;
   const nextMinute=current.minute+15,ids=participants.map(p=>p.id);
@@ -144,7 +146,8 @@ export default function MatchCenter({supabase,roomId,participant,participants,ro
     <small>As mudanças ficam privadas até serem salvas e passam a valer no próximo bloco.</small>
    </div>}
    <div className="match-events"><b>Eventos da partida</b>{current.events?.length?current.events.map((e,i)=><div className="bid-row" key={i}><span>{e.minute}' • {e.player}<small>{e.team}</small></span><b>GOL</b></div>):<small>Nenhum gol até aqui.</small>}</div>
-   {isHost?<button className="primary" disabled={busy||!!outgoing} onClick={advance}><Play size={17}/>Avançar para {current.minute+15}'</button>:<div className="draw-note"><Clock3 size={17}/>Aguardando o organizador avançar o jogo.</div>}
+   <div className="match-ready-row"><div className="draw-note"><Clock3 size={17}/><span>Você: <b>{myReady?'PRONTO':'aguardando'}</b> • Adversário: <b>{otherReady?'PRONTO':'aguardando'}</b></span></div><button className={myReady?'secondary':'primary'} disabled={busy||!!outgoing} onClick={toggleReady}>{myReady?'Cancelar PRONTO':'Estou PRONTO'}</button></div>
+   {isHost?<button className="primary" disabled={busy||!!outgoing||!myReady||!otherReady} onClick={advance}><Play size={17}/>Avançar para {current.minute+15}'</button>:<div className="draw-note"><Clock3 size={17}/>Aguardando o organizador avançar depois que os dois confirmarem PRONTO.</div>}
   </div>}
   {history.length>0&&<div className="match-history"><p className="eyebrow">HISTÓRICO DO CONFRONTO</p>{history.slice().reverse().map((h,i)=><div className="bid-row" key={h.match_id||i}><span>Partida • {new Date(h.played_at||Date.now()).toLocaleDateString("pt-BR")}</span><b>{h.home?.goals} × {h.away?.goals}</b></div>)}</div>}
  </article>;
