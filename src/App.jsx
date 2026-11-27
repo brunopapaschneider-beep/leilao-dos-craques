@@ -108,26 +108,37 @@ export default function App() {
     }
     return {starters,bench:teamRoster.filter(p=>!used.has(p.id))};
   }
-  function simulateMatch() {
+  async function simulateMatch() {
+    if (!isHost) { setMessage("Apenas o organizador pode iniciar a partida."); return; }
+    if (matchResult) { setMessage("Esta partida já foi realizada."); return; }
     const teams = participants.map(p => ({participant:p,...buildStartingEleven(roster.filter(r=>r.participant_id===p.id))}));
-    if (teams.some(t=>t.starters.length!==11)) { setMessage("Não foi possível montar o 4-4-2. Confira as posições dos elencos."); return; }
+    if (teams.some(t=>t.starters.length!==11)) { setMessage("Não foi possível montar os 11 titulares. Confira os elencos."); return; }
     const scoreTeam = (team, opponent, tacticKey, oppTacticKey) => {
-      const avg = team.starters.reduce((s,p)=>s+Number(p.rating||75),0)/11;
-      const bench = team.bench.reduce((s,p)=>s+Number(p.rating||75),0)/(team.bench.length||1);
-      const oppAvg = opponent.starters.reduce((s,p)=>s+Number(p.rating||75),0)/11;
+      const avg = team.starters.reduce((sum,p)=>sum+Number(p.rating||75),0)/11;
+      const bench = team.bench.reduce((sum,p)=>sum+Number(p.rating||75),0)/(team.bench.length||1);
+      const oppAvg = opponent.starters.reduce((sum,p)=>sum+Number(p.rating||75),0)/11;
       const strength = avg*0.78 + bench*0.08 + 10 + tactics[tacticKey].attack - tactics[oppTacticKey].defense*0.35;
       const expected = Math.max(0.15,Math.min(4.2,1.25+(strength-oppAvg)/22));
       let goals=0; for(let i=0;i<6;i++) if(Math.random()<expected/6) goals++;
       return {goals,avg:Math.round(avg),strength:Math.round(strength)};
     };
-    // Cada navegador conhece apenas a estratégia do próprio participante.
+    // O organizador gera o resultado uma única vez; o Supabase o distribui aos dois clientes.
     const localTactic = team => team.participant.id === participant?.id ? homeTactic : "equilibrado";
     const homeKey = localTactic(teams[0]), awayKey = localTactic(teams[1]);
     const h=scoreTeam(teams[0],teams[1],homeKey,awayKey), v=scoreTeam(teams[1],teams[0],awayKey,homeKey);
     const events=[];
-    [[teams[0],h.goals],[teams[1],v.goals]].forEach(([t,n])=>{const pool=t.starters.filter(p=>p.position==="Atacante"||p.position==="Meio-campo");for(let i=0;i<n;i++)events.push({team:t.participant.display_name,player:pool[Math.floor(Math.random()*pool.length)]?.player_name||"Gol",minute:Math.floor(Math.random()*90)+1});});
+    [[teams[0],h.goals],[teams[1],v.goals]].forEach(([team,n])=>{
+      const pool=team.starters.filter(p=>p.position==="Atacante"||p.position==="Meio-campo");
+      for(let i=0;i<n;i++) events.push({team:team.participant.display_name,player:pool[Math.floor(Math.random()*pool.length)]?.player_name||"Gol",minute:Math.floor(Math.random()*90)+1});
+    });
     events.sort((x,y)=>x.minute-y.minute);
-    setMatchResult({teams,home:h,away:v,events,winner:h.goals===v.goals?"Empate":h.goals>v.goals?teams[0].participant.display_name:teams[1].participant.display_name});
+    const result={teams,home:h,away:v,events,winner:h.goals===v.goals?"Empate":h.goals>v.goals?teams[0].participant.display_name:teams[1].participant.display_name};
+    setBusy(true); setMessage("");
+    const {data,error}=await supabase.rpc("save_room_match_result",{p_result:result});
+    setBusy(false);
+    if(error){setMessage(errText(error));return;}
+    setMatchResult(data || result);
+    await loadRoom(profile.room_id,profile.participant_id);
   }
   const allBudgetsExhausted = participants.length === 2 && rosterCounts.every(p => p.balance <= 0);
   const oneRosterComplete = rosterCounts.some(p => p.rosterCount >= 23);
@@ -179,6 +190,7 @@ export default function App() {
     ]);
     if (r.error) { setMessage("Sala não encontrada ou sessão expirada."); return; }
     setRoom(r.data); setParticipants(ps.data || []); setLot(l.data || null); setRoster(rs.data || []);
+    setMatchResult(r.data.match_result || null);
     if (l.data) {
       const {data: bs} = await supabase.from("bids").select("id,lot_id,participant_id,amount,created_at").eq("lot_id", l.data.id).order("amount");
       setBids(bs || []);
@@ -423,10 +435,10 @@ export default function App() {
         {matchReady && <article className="panel draw-panel">
           <p className="eyebrow">NOVA ETAPA • CAMPO</p><h3>Simulação de partidas</h3>
           <p>Os dois elencos estão completos. Monte o confronto no 4-4-2 e inicie a partida.</p>
-          <button className="primary" onClick={()=>{setShowMatch(v=>!v);setMatchResult(null);}}><Trophy size={17}/> {showMatch?"Fechar simulação":"Abrir simulação"}</button>
+          <button className="primary" onClick={()=>setShowMatch(v=>!v)}><Trophy size={17}/> {showMatch?"Fechar simulação":"Abrir simulação"}</button>
           {showMatch && <div className="match-setup">
             <div className="grid-two">{participants.map((p)=>{const lineup=buildStartingEleven(roster.filter(r=>r.participant_id===p.id));const isMyTeam=p.id===participant?.id;return <div className="panel" key={p.id}><h3>{p.display_name} • 4-4-2</h3>{isMyTeam?<><label>Sua estratégia (privada)</label><select value={homeTactic} onChange={e=>setHomeTactic(e.target.value)}>{Object.entries(tactics).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}</select></>:<><label>Estratégia do adversário</label><p className="private-tactic">🔒 Configuração privada</p></>}<b>Time titular</b>{lineup.starters.map((pl,j)=><div className="bid-row" key={pl.id}><span>{j+1}. {pl.player_name}<small>{pl.position}</small></span><b>{pl.rating||75}</b></div>)}<small>Banco: {lineup.bench.length} jogadores</small></div>})}</div>
-            <button className="primary" onClick={simulateMatch}><Trophy size={17}/> Iniciar partida</button>
+            {matchResult ? <div className="draw-note"><Trophy size={17}/><span>Partida concluída. Resultado sincronizado para os dois participantes.</span></div> : isHost ? <button className="primary" disabled={busy} onClick={simulateMatch}><Trophy size={17}/> Iniciar partida</button> : <div className="draw-note"><Trophy size={17}/><span>Aguardando Bruno, organizador da sala, iniciar a partida.</span></div>}
             {matchResult && <div className="panel match-result"><p className="eyebrow">APITO FINAL</p><h2>{matchResult.teams[0].participant.display_name} {matchResult.home.goals} × {matchResult.away.goals} {matchResult.teams[1].participant.display_name}</h2><h3>{matchResult.winner==="Empate"?"Empate":"Vitória de "+matchResult.winner}</h3><p>Força média: {matchResult.home.avg} × {matchResult.away.avg}</p><b>Gols e eventos</b>{matchResult.events.length?matchResult.events.map((e,i)=><div className="bid-row" key={i}><span>{e.minute}' • {e.player}<small>{e.team}</small></span><b>GOL</b></div>):<p>Partida sem gols.</p>}</div>}
           </div>}
         </article>}
