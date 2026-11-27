@@ -91,3 +91,5 @@ button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:12
 .match-result{width:100%}
 .match-result h2{color:#e8bd61;font:800 48px 'Barlow Condensed',sans-serif}
 @media(max-width:760px){.match-scoreboard{padding:13px 8px}.match-scoreboard strong{font-size:38px}.coach-grid{grid-template-columns:1fr}.substitution-row{grid-template-columns:1fr}.substitution-row>svg{justify-self:center;transform:rotate(90deg)}.match-launch{display:grid}.match-launch button{width:100%}}
+
+.match-ready-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}.match-ready-row .draw-note{margin:0}.match-ready-row button{margin:0!important;white-space:nowrap}@media(max-width:760px){.match-ready-row{grid-template-columns:1fr}.match-ready-row button{width:100%}}
