@@ -26,9 +26,9 @@ language sql stable security definer set search_path=public
 as $$
   select jsonb_build_object(
     'configured', true,
-    'mode', bid_mode,
-    'max_bid', max_bid,
-    'increment', increment
+    'mode', s.bid_mode,
+    'max_bid', s.max_bid,
+    'increment', s.increment
   )
   from public.lot_proxy_settings s
   join public.participants p on p.id=s.participant_id
