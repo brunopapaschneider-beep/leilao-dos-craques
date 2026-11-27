@@ -77,7 +77,8 @@ export default function App() {
   const participant = useMemo(() => participants.find(p => p.id === profile?.participant_id), [participants, profile]);
   const isHost = participant?.is_host === true;
   const highest = bids.length ? bids[bids.length - 1] : null;
-  const nextBid = lot ? (lot.current_winner ? Number(lot.current_bid) + 1 : Number(lot.starting_bid)) : 0;
+  const personalIncrement = Math.max(1, Math.trunc(Number(increment) || 1));
+  const nextBid = lot ? (lot.current_winner ? Number(lot.current_bid) + personalIncrement : Number(lot.starting_bid)) : 0;
   const chosenBid = manualBid === "" ? nextBid : Number(manualBid);
   const myTop = highest?.participant_id === participant?.id;
   const mySpent = Number(participant?.spent || 0);
@@ -85,7 +86,7 @@ export default function App() {
 
   useEffect(() => { if (participant?.club_name) setClubDraft(participant.club_name); }, [participant?.club_name]);
 
-  useEffect(() => { setManualBid(lot ? String(lot.current_winner ? Number(lot.current_bid) + 1 : Number(lot.starting_bid)) : ""); }, [lot?.id, lot?.current_bid, lot?.current_winner, lot?.starting_bid]);
+  useEffect(() => { setManualBid(lot ? String(lot.current_winner ? Number(lot.current_bid) + Math.max(1, Math.trunc(Number(increment) || 1)) : Number(lot.starting_bid)) : ""); }, [lot?.id, lot?.current_bid, lot?.current_winner, lot?.starting_bid, increment]);
 
   useEffect(() => {
     if (!supabase) return;
