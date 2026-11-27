@@ -34,21 +34,6 @@ function makeLineup(teamRoster){
 function newTeam(participant,teamRoster){
  return {participant,...makeLineup(teamRoster),coach:COACHES[Math.floor(Math.random()*COACHES.length)],tactic:"equilibrado",formation:"4-4-2",substitutions:0,subWindows:0,lastSubMinute:null,subLog:[]};
 }
-function scoreBlock(team,opponent){
- const fatigue=team.starters.reduce((n,p)=>n+Number(p.fatigue||0),0)/11;
- const attack=avg(team.starters)*TACTICS[team.tactic].attack*team.coach.attack*(1-fatigue*.0028);
- const defense=avg(team.starters)*TACTICS[team.tactic].defense*team.coach.defense*(1-fatigue*.0022);
- const formationBonus=team.formation==="4-3-3"?1.015:team.formation==="3-5-2"?1.01:team.formation==="4-2-3-1"?1.012:1;
- const strength=(attack*.68+defense*.20+avg(team.bench)*.12)*formationBonus*team.coach.control;
- const lambda=Math.max(.07,Math.min(.72,.23+(strength-avg(opponent.starters))/115));
- let goals=0;for(let i=0;i<3;i++)if(Math.random()<lambda)goals++;
- return {goals,strength:Math.round(strength),avg:Math.round(avg(team.starters))};
-}
-function scorers(team,n,start,end){
- const pool=team.starters.filter(p=>["Atacante","Meio-campo","Volante"].includes(p.position));
- return Array.from({length:n},()=>({team:teamName(team),participant_id:team.participant.id,player:pool[Math.floor(Math.random()*pool.length)]?.player_name||"Gol",minute:Math.floor(Math.random()*(end-start+1))+start,type:"goal"}));
-}
-
 export default function MatchCenter({supabase,roomId,participant,participants,roster,isHost,setMessage}){
  const [roomMatch,setRoomMatch]=useState({match_state:null,match_history:[],match_series:null,match_result:null});
  const [busy,setBusy]=useState(false),[outgoing,setOutgoing]=useState(null),[subOut,setSubOut]=useState(""),[subIn,setSubIn]=useState("");
@@ -101,21 +86,7 @@ export default function MatchCenter({supabase,roomId,participant,participants,ro
  async function toggleReady(){await callRpc('set_room_match_ready',{p_ready:!myReady});}
  async function advance(){
   if(!isHost||!current?.paused||current.status!=="live")return;
-  const nextMinute=current.minute+15,ids=participants.map(p=>p.id);
-  const left=current.teams[ids[0]],right=current.teams[ids[1]];
-  if(!left||!right)return setMessage("Escalações não encontradas.");
-  const l=scoreBlock(left,right),r=scoreBlock(right,left);
-  const events=[...(current.events||[]),...scorers(left,l.goals,current.minute+1,nextMinute),...scorers(right,r.goals,current.minute+1,nextMinute)].sort((a,b)=>a.minute-b.minute);
-  const teams={...current.teams};
-  Object.keys(teams).forEach(id=>{teams[id]={...teams[id],starters:teams[id].starters.map(p=>({...p,fatigue:Math.min(100,Number(p.fatigue||0)+9)}))};});
-  const nextScore={...score,[ids[0]]:Number(score[ids[0]]||0)+l.goals,[ids[1]]:Number(score[ids[1]]||0)+r.goals};
-  let next={...current,minute:nextMinute,paused:true,teams,score:nextScore,events,status:nextMinute===90?"finished":"live"};
-  if(nextMinute===90){
-   const hg=nextScore[ids[0]],ag=nextScore[ids[1]],winnerId=hg===ag?null:hg>ag?ids[0]:ids[1];
-   const result={match_id:current.match_id,played_at:new Date().toISOString(),teams,home:{goals:hg,avg:l.avg,strength:l.strength},away:{goals:ag,avg:r.avg,strength:r.strength},events,winner:winnerId?participants.find(p=>p.id===winnerId)?.display_name:"Empate",winner_id:winnerId,series_id:seriesActive?(series.id||null):null};
-   next={...next,result};
-  }
-  await callRpc("advance_room_match",{p_state:next});
+  await callRpc("advance_room_match",{p_state:{minute:current.minute+15}});
  }
 
  if(!ready)return <article className="panel draw-panel"><p className="eyebrow">NOVA ETAPA • CAMPO</p><h3>Central de partidas</h3><p>Complete os dois elencos com 23 jogadores para liberar o campo.</p></article>;
