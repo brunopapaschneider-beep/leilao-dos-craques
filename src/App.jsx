@@ -88,6 +88,11 @@ export default function App() {
 
   useEffect(() => { if (participant?.club_name) setClubDraft(participant.club_name); }, [participant?.club_name]);
 
+  // Sugere sempre o saldo disponível como teto inicial de cada novo lote.
+  useEffect(() => {
+    if (lot?.id && participant) setLimit(String(Math.max(0, Number(participant.budget || 0) - Number(participant.spent || 0))));
+  }, [lot?.id, participant?.id, participant?.budget, participant?.spent]);
+
   useEffect(() => { setManualBid(lot ? String(lot.current_winner ? Number(lot.current_bid) + Math.max(1, Math.trunc(Number(increment) || 1)) : Number(lot.starting_bid)) : ""); }, [lot?.id, lot?.current_bid, lot?.current_winner, lot?.starting_bid, increment]);
 
   useEffect(() => {
@@ -133,7 +138,6 @@ export default function App() {
     } else setBids([]);
     const {data: priv} = await supabase.rpc("get_my_private_limit");
     setMyPrivate(priv == null ? null : {max_bid:Number(priv)});
-    if (priv != null) setLimit(String(priv));
     if (l.data) {
       const {data: proxy} = await supabase.rpc("get_my_lot_proxy_setting", {p_lot_id:l.data.id});
       setMyProxy(proxy?.configured ? {lot_id:l.data.id, mode:proxy.mode || "automatic", max_bid:proxy.max_bid == null ? null : Number(proxy.max_bid), increment:Number(proxy.increment)} : null);
