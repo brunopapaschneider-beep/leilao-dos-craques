@@ -51,7 +51,7 @@ insert into public.player_catalog (id,player_name,position,nationality,wiki_titl
 ('cb-lucio','Lúcio','Zagueiro','Brasil','Lúcio (footballer, born 1978)',94,false),
 ('lb-roberto-carlos','Roberto Carlos','Lateral-esquerdo','Brasil','Roberto Carlos (footballer, born 1973)',99,true),
 ('lb-marcelo','Marcelo','Lateral-esquerdo','Brasil','Marcelo (footballer, born 1988)',96,false),
-('lb-maldini','Paolo Maldini (LE)','Lateral-esquerdo','Itália','Paolo Maldini',99,false),
+('lb-lizarazu','Bixente Lizarazu','Lateral-esquerdo','França','Bixente Lizarazu',94,false),
 ('lb-ashley-cole','Ashley Cole','Lateral-esquerdo','Inglaterra','Ashley Cole',95,false),
 ('lb-facchetti','Giacinto Facchetti','Lateral-esquerdo','Itália','Giacinto Facchetti',96,false),
 ('lb-alba','Jordi Alba','Lateral-esquerdo','Espanha','Jordi Alba',93,false),
