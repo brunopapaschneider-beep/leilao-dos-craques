@@ -22,3 +22,5 @@ button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:12
 @media(max-width:560px){.player-photo{width:104px;height:132px;flex-basis:104px}.auction-head h2{font-size:29px}.finance-grid b{font-size:15px}}
 
 .club-badge{width:38px;height:38px;flex:0 0 38px;border-radius:50%;background:#f4f6f8;border:1px solid #b9c5ce;display:inline-grid;place-items:center;overflow:hidden;color:#18334a;font-size:10px;font-weight:800}.club-badge img{width:100%;height:100%;object-fit:contain;padding:3px}.club-badge-large{width:58px;height:58px;flex-basis:58px}.club-preview{display:flex;align-items:center;gap:12px;margin-top:12px;color:#e7bd66;font-weight:700;font-size:13px}.panel select{appearance:auto}.person{gap:9px}
+
+.my-club-editor{display:flex;flex-direction:column;gap:6px;margin-top:7px;max-width:190px}.my-club-editor select{width:100%;min-width:0}.club-save{font-size:11px;padding:7px 9px;width:100%}
