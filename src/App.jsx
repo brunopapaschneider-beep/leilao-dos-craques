@@ -87,7 +87,8 @@ export default function App() {
   const myBalance = Math.max(0, Number(participant?.budget || 0) - mySpent);
   const rosterCounts = useMemo(() => participants.map(p => ({...p, rosterCount: roster.filter(r => r.participant_id === p.id).length, balance: Math.max(0, Number(p.budget || 0) - Number(p.spent || 0))})), [participants, roster]);
   const allBudgetsExhausted = participants.length === 2 && rosterCounts.every(p => p.balance <= 0);
-  const completionReady = allBudgetsExhausted && !lot && rosterCounts.some(p => p.rosterCount < 23);
+  const oneRosterComplete = rosterCounts.some(p => p.rosterCount >= 23);
+  const completionReady = !lot && rosterCounts.some(p => p.rosterCount < 23) && (allBudgetsExhausted || oneRosterComplete);
 
   useEffect(() => { if (participant?.club_name) setClubDraft(participant.club_name); }, [participant?.club_name]);
 
@@ -283,7 +284,7 @@ export default function App() {
   }
 
   async function completeRostersRandomly() {
-    if (!isHost || !allBudgetsExhausted || lot) return;
+    if (!isHost || !completionReady || lot) return;
     await runRpc("fill_remaining_rosters_randomly", {});
   }
 
@@ -375,7 +376,7 @@ export default function App() {
             <h3>Histórico de lances</h3><div className="bid-list">{bids.slice().reverse().map((b,i)=><div className="bid-row" key={b.id}><span>{participants.find(p=>p.id===b.participant_id)?.display_name || "Participante"}</span><b>{money(b.amount)}</b></div>)}{!bids.length && <small>Nenhum lance registrado.</small>}</div>
           </> : <div className="empty"><Trophy size={28}/><p>Quando o primeiro jogador for colocado em disputa, ele aparecerá aqui.</p></div>}
         </article>
-        {isHost && <article className="panel draw-panel"><p className="eyebrow">CONTROLE DO LEILOEIRO</p><h3>{allBudgetsExhausted ? "Preenchimento final dos elencos" : "Próximo lote automático"}</h3><p>{allBudgetsExhausted ? "Os dois orçamentos foram encerrados. O sistema distribuirá jogadores brasileiros aleatoriamente, sem custo, até cada participante completar 23 jogadores." : "O sistema sorteia um craque ainda não utilizado. Quem estiver sem saldo só poderá desistir do lote; quem ainda tiver saldo poderá disputar normalmente."}</p><div className="draw-note"><Trophy size={18}/><span>{rosterCounts.map(p => p.display_name + ": " + p.rosterCount + "/23").join(" • ")}</span></div>{completionReady ? <button className="primary" disabled={busy} onClick={completeRostersRandomly}><Gavel size={17}/> Completar elencos aleatoriamente</button> : <button className="primary" disabled={busy || participants.length < 2 || !!lot || allBudgetsExhausted} onClick={openLot}><Gavel size={17}/> Sortear próximo jogador</button>}</article>}
+        {isHost && <article className="panel draw-panel"><p className="eyebrow">CONTROLE DO LEILOEIRO</p><h3>{completionReady ? "Completar elenco pendente" : "Próximo lote automático"}</h3><p>{completionReady ? "Como um participante já completou 23 jogadores ou os dois saldos acabaram, os jogadores brasileiros restantes serão atribuídos aleatoriamente, sem custo, somente a quem ainda tiver vagas." : "O sistema sorteia um craque ainda não utilizado. Quem estiver sem saldo só poderá desistir do lote; quem ainda tiver saldo poderá disputar normalmente."}</p><div className="draw-note"><Trophy size={18}/><span>{rosterCounts.map(p => p.display_name + ": " + p.rosterCount + "/23").join(" • ")}</span></div>{completionReady ? <button className="primary" disabled={busy} onClick={completeRostersRandomly}><Gavel size={17}/> Completar elencos aleatoriamente</button> : <button className="primary" disabled={busy || participants.length < 2 || !!lot || allBudgetsExhausted || oneRosterComplete} onClick={openLot}><Gavel size={17}/> Sortear próximo jogador</button>}</article>}
       </div>
       <aside className="side-col">
         <article className="panel"><p className="eyebrow">PARTICIPANTES</p>{participants.map(p=><div className="person" key={p.id}><ClubBadge wiki={p.club_wiki_title} name={p.club_name}/><div className="avatar">{p.display_name.slice(0,1).toUpperCase()}</div><div className="person-info"><b>{p.display_name}</b><small>{p.club_name||"Clube não selecionado"}</small><small>{p.is_host?"Organizador":"Participante"}</small><small>Saldo: {money(Math.max(0,Number(p.budget)-Number(p.spent)))}</small><small>Elenco: {rosterCounts.find(x=>x.id===p.id)?.rosterCount || 0}/23</small>{p.id===participant?.id && <div className="my-club-editor"><select value={clubDraft} onChange={e=>setClubDraft(e.target.value)}>{SORTED_CLUBS.map(c=><option key={c.name} value={c.name}>{c.name}</option>)}</select><button className="secondary club-save" disabled={busy} onClick={saveMyClub}>Escolher meu clube</button></div>}</div><span className={`dot ${p.connected?"on":""}`}/></div>)}</article>
