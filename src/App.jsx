@@ -410,7 +410,7 @@ export default function App() {
           </> : <div className="empty"><Trophy size={28}/><p>Quando o primeiro jogador for colocado em disputa, ele aparecerá aqui.</p></div>}
         </article>
         {isHost && <article className="panel draw-panel"><p className="eyebrow">CONTROLE DO LEILOEIRO</p><h3>{completionReady ? "Completar elenco pendente" : "Próximo lote automático"}</h3><p>{completionReady ? "Como um participante já completou 23 jogadores ou os dois saldos acabaram, os jogadores brasileiros restantes serão atribuídos aleatoriamente, sem custo, somente a quem ainda tiver vagas." : "O sistema sorteia um craque ainda não utilizado. Quem estiver sem saldo só poderá desistir do lote; quem ainda tiver saldo poderá disputar normalmente."}</p><div className="draw-note"><Trophy size={18}/><span>{rosterCounts.map(p => p.display_name + ": " + p.rosterCount + "/23").join(" • ")}</span></div>{completionReady ? <button className="primary" disabled={busy} onClick={completeRostersRandomly}><Gavel size={17}/> Completar elencos aleatoriamente</button> : <button className="primary" disabled={busy || participants.length < 2 || !!lot || allBudgetsExhausted || oneRosterComplete} onClick={openLot}><Gavel size={17}/> Sortear próximo jogador</button>}</article>}
-        {isHost && matchReady && <article className="panel draw-panel">
+        {matchReady && <article className="panel draw-panel">
           <p className="eyebrow">NOVA ETAPA • CAMPO</p><h3>Simulação de partidas</h3>
           <p>Os dois elencos estão completos. Monte o confronto no 4-4-2 e inicie a partida.</p>
           <button className="primary" onClick={()=>{setShowMatch(v=>!v);setMatchResult(null);}}><Trophy size={17}/> {showMatch?"Fechar simulação":"Abrir simulação"}</button>
