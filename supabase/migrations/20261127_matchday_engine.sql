@@ -1,5 +1,6 @@
 -- LEILÃO DOS CRAQUES — partidas em tempo real, técnicos, substituições e séries
 alter table public.rooms
+  add column if not exists match_result jsonb,
   add column if not exists match_state jsonb,
   add column if not exists match_history jsonb not null default '[]'::jsonb,
   add column if not exists match_series jsonb;
