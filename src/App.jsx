@@ -144,12 +144,14 @@ export default function App() {
     if (!lot?.id) { setPlayerPhoto(""); return; }
     let cancelled = false;
     const title = lot.wiki_title || lot.player_name;
+    // Imagem conferida manualmente: Roberto Carlos, ex-lateral da Seleção Brasileira.
+    if (lot.player_name === "Roberto Carlos") {
+      setPlayerPhoto("https://thumb.wikimedia.org/wikipedia/commons/thumb/8/82/Roberto_Carlos.JPG/500px-Roberto_Carlos.JPG");
+      return () => {};
+    }
     const lookup = async () => {
       const wikis = ["https://pt.wikipedia.org/w/api.php", "https://en.wikipedia.org/w/api.php"];
-      // O titulo em portugues evita a ambiguidade com o cantor Roberto Carlos.
-      const searchTitles = lot.player_name === "Roberto Carlos"
-        ? ["Roberto Carlos (futebolista)", title]
-        : [title];
+      const searchTitles = [title];
       for (const searchTitle of searchTitles) {
         for (const api of wikis) {
           try {
