@@ -65,8 +65,8 @@ export default function App() {
   const [clubName, setClubName] = useState("Seleção Brasileira");
   const [clubDraft, setClubDraft] = useState("Seleção Brasileira");
   const [roomCode, setRoomCode] = useState("");
-  const [budget, setBudget] = useState("1000");
-  const [limit, setLimit] = useState("250");
+  const [budget, setBudget] = useState("150");
+  const [limit, setLimit] = useState("150");
   const [increment, setIncrement] = useState("1");
   const [playerPhoto, setPlayerPhoto] = useState("");
   const [busy, setBusy] = useState(false);
@@ -76,7 +76,7 @@ export default function App() {
   const participant = useMemo(() => participants.find(p => p.id === profile?.participant_id), [participants, profile]);
   const isHost = participant?.is_host === true;
   const highest = bids.length ? bids[bids.length - 1] : null;
-  const nextBid = lot ? (lot.current_winner ? Number(lot.current_bid) + Number(room?.increment || increment || 1) : Number(lot.starting_bid)) : 0;
+  const nextBid = lot ? (lot.current_winner ? Number(lot.current_bid) + Math.max(0.01, Number(increment) || 1) : Number(lot.starting_bid)) : 0;
   const myTop = highest?.participant_id === participant?.id;
   const mySpent = Number(participant?.spent || 0);
   const myBalance = Math.max(0, Number(participant?.budget || 0) - mySpent);
@@ -173,7 +173,7 @@ export default function App() {
     const selected = CLUBS.find(c=>c.name===clubName);
     if (!selected) return setMessage("Escolha seu clube ou a Seleção Brasileira.");
     setBusy(true); setMessage("");
-    const {data,error} = await supabase.rpc("create_auction_room",{p_name:name.trim(),p_budget:Number(budget),p_increment:Number(increment),p_player_limit:Number(limit)});
+    const {data,error} = await supabase.rpc("create_auction_room",{p_name:name.trim(),p_budget:Number(budget),p_increment:1,p_player_limit:Number(limit)});
     if(error){setBusy(false);return setMessage(errText(error));}
     const {error:clubError}=await supabase.rpc("set_my_club",{p_club_name:selected.name,p_club_wiki_title:selected.wiki});
     setBusy(false);
@@ -217,7 +217,7 @@ export default function App() {
   }
 
   async function bid() {
-    await runRpc("place_auction_bid", {p_amount:nextBid});
+    await runRpc("place_auction_bid", {p_amount:Number(nextBid.toFixed(2))});
   }
 
   async function pass() {
@@ -245,6 +245,11 @@ export default function App() {
           {lot ? <>
             <div className="price">{money(lot.current_bid || lot.starting_bid)}</div>
             <div className="muted">Maior lance público</div>
+            <div className="bid-settings">
+              <div><label>Meu valor máximo neste jogador (R$)</label><input type="number" min="1" max={myBalance} step="0.01" value={limit} onChange={e=>setLimit(e.target.value)}/></div>
+              <div><label>Incremento dos meus lances (R$)</label><input type="number" min="0.01" step="0.50" value={increment} onChange={e=>setIncrement(e.target.value)}/></div>
+              <button className="secondary" disabled={busy || !limit || Number(limit) <= 0 || Number(limit) > myBalance} onClick={setMyLimit}>Salvar meu máximo</button>
+            </div>
             <div className="bid-actions"><button className="primary bid-button" disabled={busy || lot.status!=="open" || myTop || nextBid > Number(myPrivate?.max_bid ?? 0)} onClick={bid}>Dar lance de {money(nextBid)}</button><button className="secondary" disabled={busy || lot.status!=="open"} onClick={pass}>Passar</button></div>
             <div className="notice small"><ShieldCheck size={16}/> Seu teto é secreto e validado no banco de dados. O adversário vê apenas o maior lance.</div>
             <h3>Histórico de lances</h3><div className="bid-list">{bids.slice().reverse().map((b,i)=><div className="bid-row" key={b.id}><span>{participants.find(p=>p.id===b.participant_id)?.display_name || "Participante"}</span><b>{money(b.amount)}</b></div>)}{!bids.length && <small>Nenhum lance registrado.</small>}</div>
@@ -254,7 +259,7 @@ export default function App() {
       </div>
       <aside className="side-col">
         <article className="panel"><p className="eyebrow">PARTICIPANTES</p>{participants.map(p=><div className="person" key={p.id}><ClubBadge wiki={p.club_wiki_title} name={p.club_name}/><div className="avatar">{p.display_name.slice(0,1).toUpperCase()}</div><div className="person-info"><b>{p.display_name}</b><small>{p.club_name||"Clube não selecionado"}</small><small>{p.is_host?"Organizador":"Participante"}</small><small>Saldo: {money(Number(p.budget)-Number(p.spent))}</small>{p.id===participant?.id && <div className="my-club-editor"><select value={clubDraft} onChange={e=>setClubDraft(e.target.value)}>{SORTED_CLUBS.map(c=><option key={c.name} value={c.name}>{c.name}</option>)}</select><button className="secondary club-save" disabled={busy} onClick={saveMyClub}>Escolher meu clube</button></div>}</div><span className={`dot ${p.connected?"on":""}`}/></div>)}</article>
-        <article className="panel"><p className="eyebrow">SEU CAIXA</p><div className="cash"><Wallet/><div><small>Orçamento inicial</small><b>{money(participant?.budget)}</b></div></div><div className="finance-grid"><div><small>Total investido</small><b>{money(mySpent)}</b></div><div><small>Saldo disponível</small><b className="balance">{money(myBalance)}</b></div></div><label>Seu teto secreto por jogador (R$)</label><input type="number" min="1" max={myBalance} value={limit} onChange={e=>setLimit(e.target.value)}/><button className="secondary full" disabled={busy} onClick={setMyLimit}>Atualizar meu limite privado</button><small>Limite atual: {money(myPrivate?.max_bid)} — visível somente nesta tela.</small></article>
+        <article className="panel"><p className="eyebrow">SEU CAIXA</p><div className="cash"><Wallet/><div><small>Orçamento inicial</small><b>{money(participant?.budget)}</b></div></div><div className="finance-grid"><div><small>Total investido</small><b>{money(mySpent)}</b></div><div><small>Saldo disponível</small><b className="balance">{money(myBalance)}</b></div></div><small>Máximo privado atual: {money(myPrivate?.max_bid)}. Defina um valor diferente para cada jogador em disputa.</small></article>
         <article className="panel"><p className="eyebrow">ELENCO ARREMATADO</p>{roster.length ? roster.map(r=><div className="bid-row" key={r.id}><span>{r.player_name}<small>{r.position} • {participants.find(p=>p.id===r.participant_id)?.display_name || "Participante"}</small></span><b>{money(r.winning_bid)}</b></div>) : <small>Nenhum jogador arrematado ainda.</small>}</article>
       </aside>
     </section>
