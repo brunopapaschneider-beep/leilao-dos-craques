@@ -76,7 +76,7 @@ export default function App() {
   const participant = useMemo(() => participants.find(p => p.id === profile?.participant_id), [participants, profile]);
   const isHost = participant?.is_host === true;
   const highest = bids.length ? bids[bids.length - 1] : null;
-  const nextBid = lot ? (lot.current_winner ? Number(lot.current_bid) + Math.max(0.01, Number(increment) || 1) : Number(lot.starting_bid)) : 0;
+  const nextBid = lot ? (lot.current_winner ? Number(lot.current_bid) + Math.max(1, Math.trunc(Number(increment) || 1)) : Number(lot.starting_bid)) : 0;
   const myTop = highest?.participant_id === participant?.id;
   const mySpent = Number(participant?.spent || 0);
   const myBalance = Math.max(0, Number(participant?.budget || 0) - mySpent);
@@ -258,7 +258,7 @@ export default function App() {
   }
 
   async function bid() {
-    await runRpc("place_auction_bid", {p_amount:Number(nextBid.toFixed(2))});
+    await runRpc("place_auction_bid", {p_amount:Number(nextBid)});
   }
 
   async function pass() {
@@ -287,9 +287,9 @@ export default function App() {
             <div className="price">{money(lot.current_bid || lot.starting_bid)}</div>
             <div className="muted">Maior lance público</div>
             <div className="bid-settings">
-              <div><label>Meu valor máximo neste jogador (R$)</label><input type="number" min="1" max={myBalance} step="0.01" value={limit} onChange={e=>setLimit(e.target.value)}/></div>
-              <div><label>Incremento dos meus lances (R$)</label><input type="number" min="0.01" step="0.50" value={increment} onChange={e=>setIncrement(e.target.value)}/></div>
-              <button className="secondary" disabled={busy || !limit || Number(limit) <= 0 || Number(limit) > myBalance} onClick={setMyLimit}>Salvar meu máximo</button>
+              <div><label>Meu valor máximo neste jogador (R$)</label><input type="number" min="1" max={myBalance} step="1" value={limit} onChange={e=>setLimit(e.target.value)}/></div>
+              <div><label>Incremento dos meus lances (R$)</label><input type="number" min="1" step="1" value={increment} onChange={e=>setIncrement(e.target.value)}/></div>
+              <button className="secondary" disabled={busy || !limit || Number(limit) <= 0 || !Number.isInteger(Number(limit)) || Number(limit) > myBalance || Number(increment) < 1 || !Number.isInteger(Number(increment))} onClick={setMyLimit}>Salvar meu máximo</button>
             </div>
             <div className="bid-actions"><button className="primary bid-button" disabled={busy || lot.status!=="open" || myTop || nextBid > Number(myPrivate?.max_bid ?? 0)} onClick={bid}>Dar lance de {money(nextBid)}</button><button className="secondary" disabled={busy || lot.status!=="open"} onClick={pass}>Passar</button></div>
             <div className="notice small"><ShieldCheck size={16}/> Seu teto é secreto e validado no banco de dados. O adversário vê apenas o maior lance.</div>
