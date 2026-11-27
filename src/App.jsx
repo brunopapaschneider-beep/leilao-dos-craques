@@ -85,6 +85,9 @@ export default function App() {
   const myTop = highest?.participant_id === participant?.id;
   const mySpent = Number(participant?.spent || 0);
   const myBalance = Math.max(0, Number(participant?.budget || 0) - mySpent);
+  const rosterCounts = useMemo(() => participants.map(p => ({...p, rosterCount: roster.filter(r => r.participant_id === p.id).length, balance: Math.max(0, Number(p.budget || 0) - Number(p.spent || 0))})), [participants, roster]);
+  const allBudgetsExhausted = participants.length === 2 && rosterCounts.every(p => p.balance <= 0);
+  const completionReady = allBudgetsExhausted && !lot && rosterCounts.some(p => p.rosterCount < 23);
 
   useEffect(() => { if (participant?.club_name) setClubDraft(participant.club_name); }, [participant?.club_name]);
 
@@ -249,6 +252,7 @@ export default function App() {
   }
 
   async function setMyLimit() {
+    if (myBalance <= 0) return setMessage("Seu saldo está zerado. Você não pode configurar lances.");
     if (!lot?.id) return setMessage("Não há jogador em disputa.");
     setBusy(true); setMessage("");
     const {data,error} = await supabase.rpc("save_lot_proxy", {
@@ -274,10 +278,18 @@ export default function App() {
   }
 
   async function openLot() {
+    if (myBalance <= 0) return setMessage("Seu saldo acabou. Você não pode mais ofertar; aguarde a conclusão do lote atual.");
+    if (allBudgetsExhausted) return setMessage("Os dois orçamentos foram encerrados. Use o preenchimento aleatório dos elencos.");
     await runRpc("open_random_auction_lot", {});
   }
 
+  async function completeRostersRandomly() {
+    if (!isHost || !allBudgetsExhausted || lot) return;
+    await runRpc("fill_remaining_rosters_randomly", {});
+  }
+
   async function bid() {
+    if (myBalance <= 0) return setMessage("Seu saldo está zerado. Você não pode ofertar.");
     if (myProxy?.mode !== "manual" || myProxy?.lot_id !== lot?.id) return setMessage("Ative o modo manual neste jogador antes de ofertar.");
     if (!Number.isInteger(chosenBid) || chosenBid < nextBid) return setMessage(`Informe um lance inteiro a partir de ${money(nextBid)}.`);
     if (chosenBid > myBalance) return setMessage("Saldo insuficiente para esse lance.");
@@ -335,15 +347,17 @@ export default function App() {
           {lot ? <>
             <div className="price">{money(lot.current_bid || lot.starting_bid)}</div>
             <div className="muted">Maior lance público</div>
-            <div className="bid-settings bid-settings-mode">
-              <div className="mode-picker"><label>Como deseja disputar este jogador?</label><select value={bidMode} onChange={e=>setBidMode(e.target.value)}><option value="automatic">Automático — o sistema oferece por mim</option><option value="manual">Manual — eu escolho cada lance</option></select></div>
-              {bidMode === "automatic" ? <>
-                <div><label>Meu valor máximo (R$)</label><input type="number" min="1" max={myBalance} step="1" value={limit} onChange={e=>setLimit(e.target.value)}/></div>
-                <div><label>Incremento automático (R$)</label><input type="number" min="1" step="1" value={increment} onChange={e=>setIncrement(e.target.value)}/></div>
-              </> : <div className="manual-mode-hint">Você enviará cada oferta manualmente. Se o adversário estiver no automático, o sistema poderá responder dentro do limite privado dele.</div>}
-              <button className="secondary" disabled={busy || (bidMode === "automatic" && (!limit || Number(limit) < Number(lot.starting_bid) || !Number.isInteger(Number(limit)) || Number(limit) > myBalance)) || Number(increment) < 1 || !Number.isInteger(Number(increment))} onClick={setMyLimit}>{bidMode === "automatic" ? "Salvar automático" : "Ativar modo manual"}</button>
-            </div>
-            <div className="notice small"><ShieldCheck size={16}/> Cada participante escolhe seu modo. Automático responde dentro do teto privado; manual permite escolher cada oferta. Os limites automáticos não são revelados ao adversário.</div>
+            {myBalance > 0 ? <>
+              <div className="bid-settings bid-settings-mode">
+                <div className="mode-picker"><label>Como deseja disputar este jogador?</label><select value={bidMode} onChange={e=>setBidMode(e.target.value)}><option value="automatic">Automático — o sistema oferece por mim</option><option value="manual">Manual — eu escolho cada lance</option></select></div>
+                {bidMode === "automatic" ? <>
+                  <div><label>Meu valor máximo (R$)</label><input type="number" min="1" max={myBalance} step="1" value={limit} onChange={e=>setLimit(e.target.value)}/></div>
+                  <div><label>Incremento automático (R$)</label><input type="number" min="1" step="1" value={increment} onChange={e=>setIncrement(e.target.value)}/></div>
+                </> : <div className="manual-mode-hint">Você enviará cada oferta manualmente. Se o adversário estiver no automático, o sistema poderá responder dentro do limite privado dele.</div>}
+                <button className="secondary" disabled={busy || (bidMode === "automatic" && (!limit || Number(limit) < Number(lot.starting_bid) || !Number.isInteger(Number(limit)) || Number(limit) > myBalance)) || Number(increment) < 1 || !Number.isInteger(Number(increment))} onClick={setMyLimit}>{bidMode === "automatic" ? "Salvar automático" : "Ativar modo manual"}</button>
+              </div>
+              <div className="notice small"><ShieldCheck size={16}/> Cada participante escolhe seu modo. Automático responde dentro do teto privado; manual permite escolher cada oferta. Os limites automáticos não são revelados ao adversário.</div>
+            </> : <div className="notice small"><ShieldCheck size={16}/> Seu saldo acabou. Você não pode mais ofertar; pode desistir deste jogador para que o adversário conclua o arremate.</div>}
             {lot.awaiting_response_from === participant?.id ? <div className="panel overbid-decision">
               <p className="eyebrow">DECISÃO NECESSÁRIA</p>
               <h3>Seu limite automático foi superado!</h3>
@@ -357,14 +371,15 @@ export default function App() {
               </div>
             </div> : lot.awaiting_response_from ? <div className="draw-note"><Gavel size={18}/><span>Aguardando o adversário decidir se continuará na disputa.</span></div> : null}
             {myProxy?.lot_id === lot.id ? <div className="draw-note"><ShieldCheck size={18}/><span>{myProxy.mode === "manual" ? "Modo manual ativo. Você controla seus lances." : "Modo automático ativo. Seu teto e incremento estão protegidos."}</span></div> : <div className="draw-note"><Gavel size={18}/><span>Escolha e ative seu modo de disputa para este jogador.</span></div>}
-            {myProxy?.lot_id === lot.id && myProxy.mode === "manual" && <div className="manual-bid-entry"><label>Seu lance manual (somente valor inteiro em R$)</label><input type="number" min={nextBid} step="1" value={manualBid} onChange={e=>setManualBid(e.target.value)}/><button className="primary" disabled={busy || !Number.isInteger(chosenBid) || chosenBid < nextBid || chosenBid > myBalance} onClick={bid}>Dar lance de {money(chosenBid)}</button><small>Próximo lance mínimo: {money(nextBid)}. Você pode ofertar um valor maior diretamente.</small>{lot.current_winner && !myTop && <button className="danger" disabled={busy} onClick={pass}>Desistir da disputa e confirmar o arremate</button>}</div>}
+            {myBalance > 0 && myProxy?.lot_id === lot.id && myProxy.mode === "manual" && <div className="manual-bid-entry"><label>Seu lance manual (somente valor inteiro em R$)</label><input type="number" min={nextBid} step="1" value={manualBid} onChange={e=>setManualBid(e.target.value)}/><button className="primary" disabled={busy || !Number.isInteger(chosenBid) || chosenBid < nextBid || chosenBid > myBalance} onClick={bid}>Dar lance de {money(chosenBid)}</button><small>Próximo lance mínimo: {money(nextBid)}. Você pode ofertar um valor maior diretamente.</small>{lot.current_winner && !myTop && <button className="danger" disabled={busy} onClick={pass}>Desistir da disputa e confirmar o arremate</button>}</div>}
+            {myBalance <= 0 && <div className="manual-bid-entry"><button className="danger" disabled={busy || lot.current_winner === participant?.id} onClick={pass}>{lot.current_winner ? "Desistir da disputa e confirmar o arremate" : "Desistir deste jogador"}</button>{lot.current_winner === participant?.id && <small>Você está com o maior lance. Aguarde o adversário desistir ou cobrir a oferta.</small>}</div>}
             <h3>Histórico de lances</h3><div className="bid-list">{bids.slice().reverse().map((b,i)=><div className="bid-row" key={b.id}><span>{participants.find(p=>p.id===b.participant_id)?.display_name || "Participante"}</span><b>{money(b.amount)}</b></div>)}{!bids.length && <small>Nenhum lance registrado.</small>}</div>
           </> : <div className="empty"><Trophy size={28}/><p>Quando o primeiro jogador for colocado em disputa, ele aparecerá aqui.</p></div>}
         </article>
-        {isHost && <article className="panel draw-panel"><p className="eyebrow">CONTROLE DO LEILOEIRO</p><h3>Próximo lote automático</h3><p>O sistema sorteia um craque ainda não utilizado, priorizando as posições que faltam para completar a formação 4-4-2.</p><div className="draw-note"><Trophy size={18}/><span>Jogador, posição, nacionalidade e avaliação serão exibidos para os dois participantes.</span></div><button className="primary" disabled={busy || participants.length < 2 || !!lot} onClick={openLot}><Gavel size={17}/> Sortear próximo jogador</button></article>}
+        {isHost && <article className="panel draw-panel"><p className="eyebrow">CONTROLE DO LEILOEIRO</p><h3>{allBudgetsExhausted ? "Preenchimento final dos elencos" : "Próximo lote automático"}</h3><p>{allBudgetsExhausted ? "Os dois orçamentos foram encerrados. O sistema distribuirá jogadores brasileiros aleatoriamente, sem custo, até cada participante completar 23 jogadores." : "O sistema sorteia um craque ainda não utilizado. Quem estiver sem saldo só poderá desistir do lote; quem ainda tiver saldo poderá disputar normalmente."}</p><div className="draw-note"><Trophy size={18}/><span>{rosterCounts.map(p => p.display_name + ": " + p.rosterCount + "/23").join(" • ")}</span></div>{completionReady ? <button className="primary" disabled={busy} onClick={completeRostersRandomly}><Gavel size={17}/> Completar elencos aleatoriamente</button> : <button className="primary" disabled={busy || participants.length < 2 || !!lot || myBalance <= 0 || allBudgetsExhausted} onClick={openLot}><Gavel size={17}/> Sortear próximo jogador</button>}</article>}
       </div>
       <aside className="side-col">
-        <article className="panel"><p className="eyebrow">PARTICIPANTES</p>{participants.map(p=><div className="person" key={p.id}><ClubBadge wiki={p.club_wiki_title} name={p.club_name}/><div className="avatar">{p.display_name.slice(0,1).toUpperCase()}</div><div className="person-info"><b>{p.display_name}</b><small>{p.club_name||"Clube não selecionado"}</small><small>{p.is_host?"Organizador":"Participante"}</small><small>Saldo: {money(Number(p.budget)-Number(p.spent))}</small>{p.id===participant?.id && <div className="my-club-editor"><select value={clubDraft} onChange={e=>setClubDraft(e.target.value)}>{SORTED_CLUBS.map(c=><option key={c.name} value={c.name}>{c.name}</option>)}</select><button className="secondary club-save" disabled={busy} onClick={saveMyClub}>Escolher meu clube</button></div>}</div><span className={`dot ${p.connected?"on":""}`}/></div>)}</article>
+        <article className="panel"><p className="eyebrow">PARTICIPANTES</p>{participants.map(p=><div className="person" key={p.id}><ClubBadge wiki={p.club_wiki_title} name={p.club_name}/><div className="avatar">{p.display_name.slice(0,1).toUpperCase()}</div><div className="person-info"><b>{p.display_name}</b><small>{p.club_name||"Clube não selecionado"}</small><small>{p.is_host?"Organizador":"Participante"}</small><small>Saldo: {money(Math.max(0,Number(p.budget)-Number(p.spent)))}</small><small>Elenco: {rosterCounts.find(x=>x.id===p.id)?.rosterCount || 0}/23</small>{p.id===participant?.id && <div className="my-club-editor"><select value={clubDraft} onChange={e=>setClubDraft(e.target.value)}>{SORTED_CLUBS.map(c=><option key={c.name} value={c.name}>{c.name}</option>)}</select><button className="secondary club-save" disabled={busy} onClick={saveMyClub}>Escolher meu clube</button></div>}</div><span className={`dot ${p.connected?"on":""}`}/></div>)}</article>
         <article className="panel"><p className="eyebrow">SEU CAIXA</p><div className="cash"><Wallet/><div><small>Orçamento inicial</small><b>{money(participant?.budget)}</b></div></div><div className="finance-grid"><div><small>Total investido</small><b>{money(mySpent)}</b></div><div><small>Saldo disponível</small><b className="balance">{money(myBalance)}</b></div></div><small>Máximo privado atual: {money(myPrivate?.max_bid)}. Defina um valor diferente para cada jogador em disputa.</small></article>
         <article className="panel"><p className="eyebrow">ELENCO ARREMATADO</p>{roster.length ? roster.map(r=><div className="bid-row" key={r.id}><span>{r.player_name}<small>{r.position} • {participants.find(p=>p.id===r.participant_id)?.display_name || "Participante"}</small></span><b>{money(r.winning_bid)}</b></div>) : <small>Nenhum jogador arrematado ainda.</small>}</article>
       </aside>
