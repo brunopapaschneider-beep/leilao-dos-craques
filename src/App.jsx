@@ -66,7 +66,7 @@ export default function App() {
     if (!supabase) return;
     const [r, ps, l, rs] = await Promise.all([
       supabase.from("rooms").select("*").eq("id", roomId).single(),
-      supabase.from("participants").select("id,display_name,is_host,connected,created_at").eq("room_id", roomId).order("created_at"),
+      supabase.from("participants").select("id,display_name,is_host,budget,spent,connected,created_at").eq("room_id", roomId).order("created_at"),
       supabase.from("auction_lots").select("*").eq("room_id", roomId).eq("status","open").maybeSingle(),
       supabase.from("roster").select("id,player_name,position,winning_bid,participant_id").eq("room_id", roomId)
     ]);
@@ -78,6 +78,7 @@ export default function App() {
     } else setBids([]);
     const {data: priv} = await supabase.rpc("get_my_private_limit");
     setMyPrivate(priv == null ? null : {max_bid:Number(priv)});
+    if (priv != null) setLimit(String(priv));
   }
 
   useEffect(() => {
