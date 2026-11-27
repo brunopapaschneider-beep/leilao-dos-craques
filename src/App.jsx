@@ -68,6 +68,7 @@ export default function App() {
   const [budget, setBudget] = useState("150");
   const [limit, setLimit] = useState("150");
   const [increment, setIncrement] = useState("1");
+  const [manualBid, setManualBid] = useState("");
   const [playerPhoto, setPlayerPhoto] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -76,12 +77,15 @@ export default function App() {
   const participant = useMemo(() => participants.find(p => p.id === profile?.participant_id), [participants, profile]);
   const isHost = participant?.is_host === true;
   const highest = bids.length ? bids[bids.length - 1] : null;
-  const nextBid = lot ? (lot.current_winner ? Number(lot.current_bid) + Math.max(1, Math.trunc(Number(increment) || 1)) : Number(lot.starting_bid)) : 0;
+  const nextBid = lot ? (lot.current_winner ? Number(lot.current_bid) + 1 : Number(lot.starting_bid)) : 0;
+  const chosenBid = manualBid === "" ? nextBid : Number(manualBid);
   const myTop = highest?.participant_id === participant?.id;
   const mySpent = Number(participant?.spent || 0);
   const myBalance = Math.max(0, Number(participant?.budget || 0) - mySpent);
 
   useEffect(() => { if (participant?.club_name) setClubDraft(participant.club_name); }, [participant?.club_name]);
+
+  useEffect(() => { setManualBid(lot ? String(lot.current_winner ? Number(lot.current_bid) + 1 : Number(lot.starting_bid)) : ""); }, [lot?.id, lot?.current_bid, lot?.current_winner, lot?.starting_bid]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -258,7 +262,10 @@ export default function App() {
   }
 
   async function bid() {
-    await runRpc("place_auction_bid", {p_amount:Number(nextBid)});
+    if (!Number.isInteger(chosenBid) || chosenBid < nextBid) return setMessage(`Informe um lance inteiro a partir de ${money(nextBid)}.`);
+    if (chosenBid > Number(myPrivate?.max_bid ?? 0)) return setMessage("O lance ultrapassa seu limite máximo privado.");
+    if (chosenBid > myBalance) return setMessage("Saldo insuficiente para esse lance.");
+    await runRpc("place_auction_bid", {p_amount:chosenBid});
   }
 
   async function pass() {
@@ -291,7 +298,7 @@ export default function App() {
               <div><label>Incremento dos meus lances (R$)</label><input type="number" min="1" step="1" value={increment} onChange={e=>setIncrement(e.target.value)}/></div>
               <button className="secondary" disabled={busy || !limit || Number(limit) <= 0 || !Number.isInteger(Number(limit)) || Number(limit) > myBalance || Number(increment) < 1 || !Number.isInteger(Number(increment))} onClick={setMyLimit}>Salvar meu máximo</button>
             </div>
-            <div className="bid-actions"><button className="primary bid-button" disabled={busy || lot.status!=="open" || myTop || nextBid > Number(myPrivate?.max_bid ?? 0)} onClick={bid}>Dar lance de {money(nextBid)}</button><button className="secondary" disabled={busy || lot.status!=="open"} onClick={pass}>Passar</button></div>
+            <div className="bid-actions"><input aria-label="Valor do lance em reais" type="number" min={nextBid} max={Math.min(myBalance,Number(myPrivate?.max_bid ?? 0))} step="1" value={manualBid} onChange={e=>setManualBid(e.target.value)} placeholder={`Mínimo ${nextBid}`} /><button className="primary bid-button" disabled={busy || lot.status!=="open" || myTop || !Number.isInteger(chosenBid) || chosenBid < nextBid || chosenBid > myBalance || chosenBid > Number(myPrivate?.max_bid ?? 0)} onClick={bid}>Dar lance de {money(chosenBid)}</button><button className="secondary" disabled={busy || lot.status!=="open"} onClick={pass}>Passar</button></div>
             <div className="notice small"><ShieldCheck size={16}/> Seu teto é secreto e validado no banco de dados. O adversário vê apenas o maior lance.</div>
             <h3>Histórico de lances</h3><div className="bid-list">{bids.slice().reverse().map((b,i)=><div className="bid-row" key={b.id}><span>{participants.find(p=>p.id===b.participant_id)?.display_name || "Participante"}</span><b>{money(b.amount)}</b></div>)}{!bids.length && <small>Nenhum lance registrado.</small>}</div>
           </> : <div className="empty"><Trophy size={28}/><p>Quando o primeiro jogador for colocado em disputa, ele aparecerá aqui.</p></div>}
