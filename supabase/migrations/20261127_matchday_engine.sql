@@ -210,7 +210,7 @@ begin
    where id=v_room.id;
   return v_next_state;
 end;
-$;
+$$;
 
 create or replace function public.set_room_match_ready(p_ready boolean)
 returns jsonb
@@ -236,7 +236,7 @@ begin
   update public.rooms set match_state=v_state where id=v_room.id;
   return v_state;
 end;
-$;
+$$;
 
 revoke all on function public.start_room_match(jsonb,boolean) from public;
 revoke all on function public.update_room_match_team(uuid,jsonb) from public;
