@@ -264,7 +264,7 @@ begin
   select coalesce(avg(coalesce((x.player->>'rating')::numeric,75)),75)
     into v_right_avg from jsonb_array_elements(v_right_team->'starters') as x(player);
   v_left_lambda:=greatest(0.07,least(0.72,0.23+(v_left_strength-v_right_avg)/115));
-  v_right_lambda:=greatest(0.07,least(0.72,0.23+(v_right_strength-v_left_avg)/115);
+  v_right_lambda:=greatest(0.07,least(0.72,0.23+(v_right_strength-v_left_avg)/115));
 
   for v_i in 1..3 loop
     if random()<v_left_lambda then v_left_goals:=v_left_goals+1; end if;
