@@ -65,7 +65,9 @@ begin
 
   if p_state is null or jsonb_typeof(p_state) <> 'object'
      or coalesce(p_state->>'minute','') <> '0'
-     or jsonb_typeof(p_state->'teams') <> 'object' then
+     or jsonb_typeof(p_state->'teams') <> 'object'
+     or not ((p_state->'teams') ? v_left_id)
+     or not ((p_state->'teams') ? v_right_id) then
     raise exception 'Configuração inicial da partida inválida.';
   end if;
 
@@ -95,10 +97,13 @@ begin
    where user_id=auth.uid() order by created_at desc limit 1;
   if not found then raise exception 'Participante não encontrado.'; end if;
   if v_part.id <> p_team_id then raise exception 'Você só pode alterar o próprio time.'; end if;
-  if jsonb_typeof(p_team) <> 'object'
-     or jsonb_typeof(p_team->'starters') <> 'array'
-     or jsonb_typeof(p_team->'bench') <> 'array'
-     or jsonb_array_length(p_team->'starters') <> 11
+  if p_team is null or jsonb_typeof(p_team) <> 'object' then
+    raise exception 'Equipe inválida.';
+  end if;
+  if jsonb_typeof(p_team->'starters') <> 'array' or jsonb_typeof(p_team->'bench') <> 'array' then
+    raise exception 'Escalação inválida.';
+  end if;
+  if jsonb_array_length(p_team->'starters') <> 11
      or coalesce((p_team->>'substitutions')::integer,0) > 5
      or coalesce((p_team->>'subWindows')::integer,0) > 3 then
     raise exception 'Escalação ou limite de substituições inválido.';
