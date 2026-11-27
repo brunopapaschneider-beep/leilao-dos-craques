@@ -61,6 +61,7 @@ export default function App() {
   const [roster, setRoster] = useState([]);
   const [name, setName] = useState("");
   const [clubName, setClubName] = useState("Seleção Brasileira");
+  const [clubDraft, setClubDraft] = useState("Seleção Brasileira");
   const [roomCode, setRoomCode] = useState("");
   const [budget, setBudget] = useState("1000");
   const [limit, setLimit] = useState("250");
@@ -77,6 +78,8 @@ export default function App() {
   const myTop = highest?.participant_id === participant?.id;
   const mySpent = Number(participant?.spent || 0);
   const myBalance = Math.max(0, Number(participant?.budget || 0) - mySpent);
+
+  useEffect(() => { if (participant?.club_name) setClubDraft(participant.club_name); }, [participant?.club_name]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -193,6 +196,15 @@ export default function App() {
     await loadRoom(data.room_id,data.participant_id);
   }
 
+  async function saveMyClub() {
+    const selected = CLUBS.find(c => c.name === clubDraft);
+    if (!selected || !participant?.id) return setMessage("Escolha um clube válido.");
+    const {error} = await supabase.rpc("set_my_club_for_participant", {p_participant_id: participant.id, p_club_name: selected.name, p_club_wiki_title: selected.wiki});
+    if (error) return setMessage(errText(error));
+    setMessage("Seu clube foi atualizado.");
+    await loadRoom(profile.room_id, profile.participant_id);
+  }
+
   async function setMyLimit() {
     const {data, error} = await runRpc("set_my_private_limit", {p_limit:Number(limit)});
     if (!error) { setMyPrivate({max_bid:Number(limit)}); setMessage("Seu limite privado foi atualizado."); }
@@ -239,7 +251,7 @@ export default function App() {
         {isHost && <article className="panel draw-panel"><p className="eyebrow">CONTROLE DO LEILOEIRO</p><h3>Próximo lote automático</h3><p>O sistema sorteia um craque ainda não utilizado, priorizando as posições que faltam para completar a formação 4-4-2.</p><div className="draw-note"><Trophy size={18}/><span>Jogador, posição, nacionalidade e avaliação serão exibidos para os dois participantes.</span></div><button className="primary" disabled={busy || participants.length < 2 || !!lot} onClick={openLot}><Gavel size={17}/> Sortear próximo jogador</button></article>}
       </div>
       <aside className="side-col">
-        <article className="panel"><p className="eyebrow">PARTICIPANTES</p>{participants.map(p=><div className="person" key={p.id}><ClubBadge wiki={p.club_wiki_title} name={p.club_name}/><div className="avatar">{p.display_name.slice(0,1).toUpperCase()}</div><div className="person-info"><b>{p.display_name}</b><small>{p.club_name||"Clube não selecionado"}</small><small>{p.is_host?"Organizador":"Participante"}</small><small>Saldo: {money(Number(p.budget)-Number(p.spent))}</small></div><span className={`dot ${p.connected?"on":""}`}/></div>)}</article>
+        <article className="panel"><p className="eyebrow">PARTICIPANTES</p>{participants.map(p=><div className="person" key={p.id}><ClubBadge wiki={p.club_wiki_title} name={p.club_name}/><div className="avatar">{p.display_name.slice(0,1).toUpperCase()}</div><div className="person-info"><b>{p.display_name}</b><small>{p.club_name||"Clube não selecionado"}</small><small>{p.is_host?"Organizador":"Participante"}</small><small>Saldo: {money(Number(p.budget)-Number(p.spent))}</small>{p.id===participant?.id && <div className="my-club-editor"><select value={clubDraft} onChange={e=>setClubDraft(e.target.value)}>{CLUBS.map(c=><option key={c.name} value={c.name}>{c.name}</option>)}</select><button className="secondary club-save" disabled={busy} onClick={saveMyClub}>Escolher meu clube</button></div>}</div><span className={`dot ${p.connected?"on":""}`}/></div>)}</article>
         <article className="panel"><p className="eyebrow">SEU CAIXA</p><div className="cash"><Wallet/><div><small>Orçamento inicial</small><b>{money(participant?.budget)}</b></div></div><div className="finance-grid"><div><small>Total investido</small><b>{money(mySpent)}</b></div><div><small>Saldo disponível</small><b className="balance">{money(myBalance)}</b></div></div><label>Seu teto secreto por jogador (R$)</label><input type="number" min="1" max={myBalance} value={limit} onChange={e=>setLimit(e.target.value)}/><button className="secondary full" disabled={busy} onClick={setMyLimit}>Atualizar meu limite privado</button><small>Limite atual: {money(myPrivate?.max_bid)} — visível somente nesta tela.</small></article>
         <article className="panel"><p className="eyebrow">ELENCO ARREMATADO</p>{roster.length ? roster.map(r=><div className="bid-row" key={r.id}><span>{r.player_name}<small>{r.position} • {participants.find(p=>p.id===r.participant_id)?.display_name || "Participante"}</small></span><b>{money(r.winning_bid)}</b></div>) : <small>Nenhum jogador arrematado ainda.</small>}</article>
       </aside>
