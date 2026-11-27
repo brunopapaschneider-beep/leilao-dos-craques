@@ -53,3 +53,12 @@ button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:12
 .decision-actions .danger{background:#6b2930;color:#fff;border:1px solid #a34c55;border-radius:9px;padding:11px 14px;font-weight:700;cursor:pointer}
 .decision-actions button:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:760px){.decision-actions{flex-direction:column}.decision-actions button{width:100%}}
+
+.match-setup{display:grid;gap:18px;margin-top:18px}
+.grid-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.grid-two>.panel{padding:16px}
+.grid-two h3{margin-top:0}
+.grid-two select{width:100%;margin:8px 0 14px}
+.match-result{text-align:center;margin-top:16px}
+.match-result h2{font-size:clamp(24px,4vw,38px);color:#e8bd61}
+@media(max-width:760px){.grid-two{grid-template-columns:1fr}}
