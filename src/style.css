@@ -62,3 +62,32 @@ button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:12
 .match-result{text-align:center;margin-top:16px}
 .match-result h2{font-size:clamp(24px,4vw,38px);color:#e8bd61}
 @media(max-width:760px){.grid-two{grid-template-columns:1fr}}
+
+
+.match-center{display:grid;gap:14px}
+.match-launch{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.match-launch button{margin:0!important}
+.match-scoreboard{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;padding:20px;border-radius:16px;background:linear-gradient(110deg,#173b55,#10263a);border:1px solid #38516a;text-align:center}
+.match-scoreboard>div{display:grid;gap:5px;min-width:0}
+.match-scoreboard small{font-size:11px;color:#b7c9d7;overflow-wrap:anywhere}
+.match-scoreboard strong{font:800 48px 'Barlow Condensed',sans-serif;color:#e8bd64}
+.match-clock span{font:800 30px 'Barlow Condensed',sans-serif;color:#fff}
+.match-clock small{font-size:9px;letter-spacing:1.5px}
+.coach-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.coach-card{padding:14px;border:1px solid #2b4b65;border-radius:12px;background:#0a1c2c;display:grid;gap:5px}
+.coach-card b{color:#f0c66d}
+.coach-card small{font-size:11px;color:#a9bdcd}
+.team-control{display:grid;gap:8px}
+.team-control label{margin:6px 0 0!important}
+.team-control button{margin:8px 0 0!important}
+.sub-status{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid #294861;background:#10283d;border-radius:10px;color:#d9e5ed;font-size:12px}
+.substitution-row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;gap:8px;align-items:center}
+.substitution-row select{min-width:0}
+.substitution-row button{white-space:nowrap}
+.lineup-mini{max-height:260px;overflow:auto;padding:10px 13px;border-radius:11px;background:#071827;border:1px solid #20394e}
+.lineup-mini>b{display:block;margin-bottom:5px;color:#e5bd68}
+.match-events,.match-history{padding:14px;border-radius:12px;border:1px solid #294861;background:#0a1c2c}
+.match-events>b{display:block;margin-bottom:8px}
+.match-result{width:100%}
+.match-result h2{color:#e8bd61;font:800 48px 'Barlow Condensed',sans-serif}
+@media(max-width:760px){.match-scoreboard{padding:13px 8px}.match-scoreboard strong{font-size:38px}.coach-grid{grid-template-columns:1fr}.substitution-row{grid-template-columns:1fr}.substitution-row>svg{justify-self:center;transform:rotate(90deg)}.match-launch{display:grid}.match-launch button{width:100%}}
