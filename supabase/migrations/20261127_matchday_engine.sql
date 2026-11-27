@@ -47,10 +47,10 @@ begin
     if coalesce((v_room.match_series->>'active')::boolean,false) then
       v_series := v_room.match_series;
     else
-      select count(*) into v_left_wins from jsonb_array_elements(v_history) h
-       where h->>'winner_id'=v_left_id;
-      select count(*) into v_right_wins from jsonb_array_elements(v_history) h
-       where h->>'winner_id'=v_right_id;
+      select count(*) into v_left_wins from jsonb_array_elements(v_history) as h(item)
+       where h.item->>'winner_id'=v_left_id;
+      select count(*) into v_right_wins from jsonb_array_elements(v_history) as h(item)
+       where h.item->>'winner_id'=v_right_id;
       if v_left_wins < 1 or v_right_wins < 1 then
         raise exception 'A melhor de 3 só é liberada depois de uma vitória de cada participante.';
       end if;
