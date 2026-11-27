@@ -143,7 +143,9 @@ export default function App() {
   useEffect(() => {
     if (!lot?.id) { setPlayerPhoto(""); return; }
     let cancelled = false;
-    const title = lot.wiki_title || lot.player_name;
+    let title = lot.wiki_title || lot.player_name;
+    // Desambiguação explícita para o goleiro brasileiro Dida (Nélson de Jesus Silva).
+    if (lot.player_name === "Dida") title = "Dida (footballer, born 1973)";
     // Imagem conferida manualmente: Roberto Carlos, ex-lateral da Seleção Brasileira.
     if (lot.player_name === "Roberto Carlos") {
       setPlayerPhoto("https://thumb.wikimedia.org/wikipedia/commons/thumb/8/82/Roberto_Carlos.JPG/500px-Roberto_Carlos.JPG");
@@ -231,8 +233,24 @@ export default function App() {
   }
 
   async function setMyLimit() {
-    const {data, error} = await runRpc("set_my_private_limit", {p_limit:Number(limit)});
-    if (!error) { setMyPrivate({max_bid:Number(limit)}); setMessage("Seu limite privado foi atualizado."); }
+    if (!lot?.id) return setMessage("Não há jogador em disputa.");
+    setBusy(true); setMessage("");
+    const {data,error} = await supabase.rpc("save_lot_proxy", {
+      p_lot_id: lot.id,
+      p_max_bid: Number(limit),
+      p_increment: Number(increment)
+    });
+    setBusy(false);
+    if (error) return setMessage(errText(error));
+    setMyPrivate({max_bid:Number(limit)});
+    if (data?.resolved) {
+      setMessage(data.you_won
+        ? "Disputa automática concluída: você venceu pelo menor valor necessário."
+        : "Disputa automática concluída: o adversário venceu.");
+    } else {
+      setMessage("Seu máximo e incremento foram salvos em sigilo. Aguardando o adversário configurar os dele.");
+    }
+    if (profile) await loadRoom(profile.room_id, profile.participant_id);
   }
 
   async function openLot() {
