@@ -49,8 +49,16 @@ npm run dev
 1. Abra o site no computador do Bruno e clique em **Entrar no jogo**.
 2. Crie uma sala e compartilhe o código com Miguel.
 3. Miguel abre o mesmo endereço em outro computador, entra com seu nome e o código.
-4. O organizador abre um lote; ambos dão lances ou passam.
-5. Cada participante ajusta somente seu próprio limite privado.
+4. O organizador clica em **Sortear próximo jogador**; o banco seleciona um craque disponível para uma posição ainda necessária no elenco.
+5. A ficha do jogador é exibida para os dois participantes; a foto é carregada da Wikipédia quando disponível.
+6. Ambos dão lances ou passam. O painel apresenta orçamento inicial, total investido e saldo disponível.
+
+## Atualização: sorteio automático e fotos
+1. Depois de aplicar `supabase/schema.sql`, abra no GitHub o arquivo `supabase/migrations/20261127_player_catalog_random_draw.sql`.
+2. Copie todo o SQL, cole no SQL Editor do mesmo projeto Supabase e clique em **Run**.
+3. Aguarde a confirmação de sucesso. A atualização cria o catálogo inicial, os dados complementares dos lotes e a função de sorteio automático.
+4. O sorteio evita repetir jogadores na mesma sala e prioriza posições ainda não preenchidas na formação: 2 goleiros, 2 laterais-direitos, 4 zagueiros, 2 laterais-esquerdos, 2 volantes, 3 meias e 3 atacantes.
+5. As fotos são buscadas a partir das páginas correspondentes na Wikipédia; alguns jogadores podem não ter miniatura disponível.
 
 ## Limitações conhecidas do MVP
 - A sala aceita dois participantes.
