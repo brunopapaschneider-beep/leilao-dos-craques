@@ -284,6 +284,32 @@ export default function App() {
     await runRpc("pass_auction_lot", {});
   }
 
+  async function respondOverbid(action) {
+    if (!lot?.id) return;
+    const newMax = Number(limit);
+    if (action === "automatic" && (!Number.isInteger(newMax) || newMax <= Number(lot.current_bid) || newMax > myBalance)) {
+      return setMessage(`Informe um novo máximo inteiro, acima de ${money(lot.current_bid)} e dentro do seu saldo.`);
+    }
+    setBusy(true); setMessage("");
+    const {data,error} = await supabase.rpc("respond_to_overbid", {
+      p_action: action,
+      p_new_max: action === "automatic" ? newMax : null
+    });
+    setBusy(false);
+    if (error) return setMessage(errText(error));
+    if (action === "decline") setMessage("Você declinou da disputa. O jogador foi arrematado pelo maior lance atual.");
+    else if (action === "manual") {
+      setBidMode("manual");
+      setMyProxy({lot_id:lot.id,mode:"manual",max_bid:null,increment:Number(increment)});
+      setMessage("Você decidiu continuar manualmente. Faça sua próxima oferta.");
+    } else {
+      setBidMode("automatic");
+      setMyProxy({lot_id:lot.id,mode:"automatic",max_bid:newMax,increment:Number(increment)});
+      setMessage("Novo limite automático salvo. Você voltou à disputa.");
+    }
+    if (profile) await loadRoom(profile.room_id,profile.participant_id);
+  }
+
   async function logout() {
     localStorage.removeItem("ldc_profile");
     setProfile(null); setRoom(null); setParticipants([]); setLot(null); setBids([]); setRoster([]); setMyPrivate(null);
@@ -314,6 +340,18 @@ export default function App() {
               <button className="secondary" disabled={busy || (bidMode === "automatic" && (!limit || Number(limit) < Number(lot.starting_bid) || !Number.isInteger(Number(limit)) || Number(limit) > myBalance)) || Number(increment) < 1 || !Number.isInteger(Number(increment))} onClick={setMyLimit}>{bidMode === "automatic" ? "Salvar automático" : "Ativar modo manual"}</button>
             </div>
             <div className="notice small"><ShieldCheck size={16}/> Cada participante escolhe seu modo. Automático responde dentro do teto privado; manual permite escolher cada oferta. Os limites automáticos não são revelados ao adversário.</div>
+            {lot.awaiting_response_from === participant?.id ? <div className="panel overbid-decision">
+              <p className="eyebrow">DECISÃO NECESSÁRIA</p>
+              <h3>Seu limite automático foi superado!</h3>
+              <p>O adversário cobriu seu máximo. Você pode continuar aumentando seu limite, seguir manualmente ou declinar da disputa.</p>
+              <label>Novo máximo automático (R$)</label>
+              <input type="number" min={Number(lot.current_bid)+1} step="1" value={limit} onChange={e=>setLimit(e.target.value)}/>
+              <div className="decision-actions">
+                <button className="primary" disabled={busy || !Number.isInteger(Number(limit)) || Number(limit)<=Number(lot.current_bid) || Number(limit)>myBalance} onClick={()=>respondOverbid("automatic")}>Aumentar máximo e continuar</button>
+                <button className="secondary" disabled={busy} onClick={()=>respondOverbid("manual")}>Continuar manualmente</button>
+                <button className="danger" disabled={busy} onClick={()=>respondOverbid("decline")}>Declinar da disputa</button>
+              </div>
+            </div> : lot.awaiting_response_from ? <div className="draw-note"><Gavel size={18}/><span>Aguardando o adversário decidir se continuará na disputa.</span></div> : null}
             {myProxy?.lot_id === lot.id ? <div className="draw-note"><ShieldCheck size={18}/><span>{myProxy.mode === "manual" ? "Modo manual ativo. Você controla seus lances." : "Modo automático ativo. Seu teto e incremento estão protegidos."}</span></div> : <div className="draw-note"><Gavel size={18}/><span>Escolha e ative seu modo de disputa para este jogador.</span></div>}
             {myProxy?.lot_id === lot.id && myProxy.mode === "manual" && <div className="manual-bid-entry"><label>Seu lance manual (somente valor inteiro em R$)</label><input type="number" min={nextBid} step="1" value={manualBid} onChange={e=>setManualBid(e.target.value)}/><button className="primary" disabled={busy || !Number.isInteger(chosenBid) || chosenBid < nextBid || chosenBid > myBalance} onClick={bid}>Dar lance de {money(chosenBid)}</button><small>Próximo lance mínimo: {money(nextBid)}. Você pode ofertar um valor maior diretamente.</small></div>}
             <h3>Histórico de lances</h3><div className="bid-list">{bids.slice().reverse().map((b,i)=><div className="bid-row" key={b.id}><span>{participants.find(p=>p.id===b.participant_id)?.display_name || "Participante"}</span><b>{money(b.amount)}</b></div>)}{!bids.length && <small>Nenhum lance registrado.</small>}</div>
