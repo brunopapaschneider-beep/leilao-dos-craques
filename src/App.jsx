@@ -146,19 +146,25 @@ export default function App() {
     const title = lot.wiki_title || lot.player_name;
     const lookup = async () => {
       const wikis = ["https://pt.wikipedia.org/w/api.php", "https://en.wikipedia.org/w/api.php"];
-      for (const api of wikis) {
-        try {
-          const params = new URLSearchParams({
-            action: "query", format: "json", formatversion: "2",
-            prop: "pageimages", piprop: "thumbnail", pithumbsize: "600",
-            redirects: "1", origin: "*", titles: title
-          });
-          const response = await fetch(`${api}?${params.toString()}`);
-          if (!response.ok) continue;
-          const data = await response.json();
-          const image = data?.query?.pages?.[0]?.thumbnail?.source;
-          if (image) { if (!cancelled) setPlayerPhoto(image); return; }
-        } catch {}
+      // O titulo em portugues evita a ambiguidade com o cantor Roberto Carlos.
+      const searchTitles = lot.player_name === "Roberto Carlos"
+        ? ["Roberto Carlos (futebolista)", title]
+        : [title];
+      for (const searchTitle of searchTitles) {
+        for (const api of wikis) {
+          try {
+            const params = new URLSearchParams({
+              action: "query", format: "json", formatversion: "2",
+              prop: "pageimages", piprop: "thumbnail", pithumbsize: "600",
+              redirects: "1", origin: "*", titles: searchTitle
+            });
+            const response = await fetch(`${api}?${params.toString()}`);
+            if (!response.ok) continue;
+            const data = await response.json();
+            const image = data?.query?.pages?.[0]?.thumbnail?.source;
+            if (image) { if (!cancelled) setPlayerPhoto(image); return; }
+          } catch {}
+        }
       }
       if (!cancelled) setPlayerPhoto("");
     };
