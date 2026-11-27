@@ -30,3 +30,14 @@ button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:12
 .bid-settings input{width:100%;min-width:0;padding:11px;border-radius:9px;border:1px solid #31516d;background:#071827;color:#f0f5f8}
 .bid-settings button{margin:0!important;white-space:nowrap}
 @media(max-width:760px){.bid-settings{grid-template-columns:1fr 1fr}.bid-settings button{grid-column:1/-1}}
+
+.bid-settings-mode{grid-template-columns:1fr 1fr 1fr auto}
+.bid-settings-mode .mode-picker{grid-column:1/-1}
+.bid-settings-mode .mode-picker select{width:100%;padding:11px;border-radius:9px;border:1px solid #31516d;background:#071827;color:#f0f5f8}
+.manual-mode-hint{grid-column:span 2;align-self:center;color:#b8cbd9;font-size:12px;line-height:1.5;padding:10px 12px;background:#10283d;border-radius:9px}
+.manual-bid-entry{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end;margin:16px 0;padding:14px;border:1px solid #294861;background:#0a1c2c;border-radius:13px}
+.manual-bid-entry label{grid-column:1/-1;margin:0!important}
+.manual-bid-entry input{min-width:0;padding:12px;border-radius:9px;border:1px solid #31516d;background:#071827;color:#f0f5f8}
+.manual-bid-entry button{margin:0!important}
+.manual-bid-entry small{grid-column:1/-1;margin:0}
+@media(max-width:760px){.bid-settings-mode{grid-template-columns:1fr}.bid-settings-mode .mode-picker,.manual-mode-hint{grid-column:1}.manual-bid-entry{grid-template-columns:1fr}.manual-bid-entry label,.manual-bid-entry small{grid-column:1}}
