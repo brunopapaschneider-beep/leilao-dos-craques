@@ -41,3 +41,15 @@ button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:12
 .manual-bid-entry button{margin:0!important}
 .manual-bid-entry small{grid-column:1/-1;margin:0}
 @media(max-width:760px){.bid-settings-mode{grid-template-columns:1fr}.bid-settings-mode .mode-picker,.manual-mode-hint{grid-column:1}.manual-bid-entry{grid-template-columns:1fr}.manual-bid-entry label,.manual-bid-entry small{grid-column:1}}
+
+
+.overbid-decision{margin:16px 0;padding:18px;border:1px solid #b98636;background:linear-gradient(135deg,#382b18,#14283a);border-radius:13px}
+.overbid-decision h3{margin:4px 0 8px;color:#f4c66d}
+.overbid-decision p{font-size:13px;line-height:1.55;color:#d4e0e9}
+.overbid-decision label{display:block;margin:12px 0 6px;color:#d7e2ea;font-size:12px;font-weight:700}
+.overbid-decision input{width:100%;max-width:260px;padding:11px;border-radius:9px;border:1px solid #526b80;background:#071827;color:#fff}
+.decision-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}
+.decision-actions button{margin:0!important}
+.decision-actions .danger{background:#6b2930;color:#fff;border:1px solid #a34c55;border-radius:9px;padding:11px 14px;font-weight:700;cursor:pointer}
+.decision-actions button:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:760px){.decision-actions{flex-direction:column}.decision-actions button{width:100%}}
