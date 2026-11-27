@@ -218,7 +218,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = public
-as $
+as $$
 declare
   v_part public.participants;
   v_room public.rooms;
