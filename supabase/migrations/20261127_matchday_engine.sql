@@ -5,6 +5,26 @@ alter table public.rooms
   add column if not exists match_history jsonb not null default '[]'::jsonb,
   add column if not exists match_series jsonb;
 
+-- Preserva eventual resultado da simulação anterior no histórico e identifica o vencedor.
+update public.rooms r
+   set match_history = jsonb_build_array(
+     jsonb_set(
+       r.match_result,
+       '{winner_id}',
+       coalesce(
+         (select to_jsonb(p.id::text)
+            from public.participants p
+           where p.room_id = r.id
+             and p.display_name = r.match_result->>'winner'
+           limit 1),
+         'null'::jsonb
+       ),
+       true
+     )
+   )
+ where r.match_result is not null
+   and coalesce(r.match_history, '[]'::jsonb) = '[]'::jsonb;
+
 create or replace function public.start_room_match(p_state jsonb, p_best_of_three boolean default false)
 returns jsonb
 language plpgsql
