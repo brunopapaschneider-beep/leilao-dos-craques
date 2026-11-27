@@ -145,13 +145,18 @@ export default function App() {
     let cancelled = false;
     const title = lot.wiki_title || lot.player_name;
     const lookup = async () => {
-      const endpoints = ["https://pt.wikipedia.org/api/rest_v1/page/summary/", "https://en.wikipedia.org/api/rest_v1/page/summary/"];
-      for (const endpoint of endpoints) {
+      const wikis = ["https://pt.wikipedia.org/w/api.php", "https://en.wikipedia.org/w/api.php"];
+      for (const api of wikis) {
         try {
-          const response = await fetch(endpoint + encodeURIComponent(title));
+          const params = new URLSearchParams({
+            action: "query", format: "json", formatversion: "2",
+            prop: "pageimages", piprop: "thumbnail", pithumbsize: "600",
+            redirects: "1", origin: "*", titles: title
+          });
+          const response = await fetch(`${api}?${params.toString()}`);
           if (!response.ok) continue;
           const data = await response.json();
-          const image = data?.thumbnail?.source || data?.originalimage?.source;
+          const image = data?.query?.pages?.[0]?.thumbnail?.source;
           if (image) { if (!cancelled) setPlayerPhoto(image); return; }
         } catch {}
       }
