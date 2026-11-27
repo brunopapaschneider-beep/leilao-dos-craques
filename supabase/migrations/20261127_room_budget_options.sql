@@ -33,7 +33,7 @@ begin
     raise exception 'Dados inválidos: confira nome, orçamento e teto individual.';
   end if;
 
-  v_code := upper(substr(encode(gen_random_bytes(6),'hex'),1,6));
+  v_code := upper(substr(replace(gen_random_uuid()::text,'-',''),1,6));
   insert into public.rooms(room_code,host_user_id,increment,budget)
   values(v_code,auth.uid(),p_increment,p_budget)
   returning * into v_room;
