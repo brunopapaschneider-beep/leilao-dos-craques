@@ -9,6 +9,48 @@ const supabase = url && anon ? createClient(url, anon) : null;
 const money = (n) => new Intl.NumberFormat("pt-BR", {style:"currency", currency:"BRL"}).format(Number(n || 0));
 const errText = (e) => e?.message || "Não foi possível concluir a operação.";
 
+const CLUBS = [
+{name:"Seleção Brasileira",wiki:"Seleção Brasileira de Futebol",group:"Seleção"},
+{name:"Flamengo",wiki:"Clube de Regatas do Flamengo",group:"Série A"},
+{name:"Palmeiras",wiki:"Sociedade Esportiva Palmeiras",group:"Série A"},
+{name:"Corinthians",wiki:"Sport Club Corinthians Paulista",group:"Série A"},
+{name:"São Paulo",wiki:"São Paulo Futebol Clube",group:"Série A"},
+{name:"Santos",wiki:"Santos Futebol Clube",group:"Série A"},
+{name:"Grêmio",wiki:"Grêmio Foot-Ball Porto Alegrense",group:"Série A"},
+{name:"Internacional",wiki:"Sport Club Internacional",group:"Série A"},
+{name:"Atlético-MG",wiki:"Clube Atlético Mineiro",group:"Série A"},
+{name:"Cruzeiro",wiki:"Cruzeiro Esporte Clube",group:"Série A"},
+{name:"Botafogo",wiki:"Botafogo de Futebol e Regatas",group:"Série A"},
+{name:"Fluminense",wiki:"Fluminense Football Club",group:"Série A"},
+{name:"Vasco",wiki:"Club de Regatas Vasco da Gama",group:"Série A"},
+{name:"Bahia",wiki:"Esporte Clube Bahia",group:"Série A"},
+{name:"Vitória",wiki:"Esporte Clube Vitória",group:"Série A"},
+{name:"Athletico-PR",wiki:"Club Athletico Paranaense",group:"Série A/B"},
+{name:"Fortaleza",wiki:"Fortaleza Esporte Clube",group:"Série A/B"},
+{name:"Ceará",wiki:"Ceará Sporting Club",group:"Série A/B"},
+{name:"Sport",wiki:"Sport Club do Recife",group:"Série A/B"},
+{name:"Coritiba",wiki:"Coritiba Foot Ball Club",group:"Série A/B"},
+{name:"Goiás",wiki:"Goiás Esporte Clube",group:"Tradicional"},
+{name:"América-MG",wiki:"América Futebol Clube (Belo Horizonte)",group:"Tradicional"},
+{name:"Chapecoense",wiki:"Associação Chapecoense de Futebol",group:"Tradicional"},
+{name:"Criciúma",wiki:"Criciúma Esporte Clube",group:"Tradicional"},
+{name:"Ponte Preta",wiki:"Associação Atlética Ponte Preta",group:"Tradicional"},
+{name:"Guarani",wiki:"Guarani Futebol Clube",group:"Tradicional"},
+{name:"Santa Cruz",wiki:"Santa Cruz Futebol Clube",group:"Tradicional"},
+{name:"Náutico",wiki:"Clube Náutico Capibaribe",group:"Tradicional"},
+{name:"Remo",wiki:"Clube do Remo",group:"Tradicional"},
+{name:"Paysandu",wiki:"Paysandu Sport Club",group:"Tradicional"},
+{name:"Vila Nova",wiki:"Vila Nova Futebol Clube",group:"Tradicional"},
+{name:"ABC",wiki:"ABC Futebol Clube",group:"Tradicional"},
+{name:"Figueirense",wiki:"Figueirense Futebol Clube",group:"Tradicional"}
+];
+
+function ClubBadge({wiki,name,large=false}) {
+ const [src,setSrc]=useState("");
+ useEffect(()=>{if(!wiki){setSrc("");return;}let cancelled=false;fetch(`https://pt.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wiki)}`).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(!cancelled)setSrc(d?.thumbnail?.source||d?.originalimage?.source||"");}).catch(()=>{if(!cancelled)setSrc("");});return()=>{cancelled=true;};},[wiki]);
+ return <span className={large?"club-badge club-badge-large":"club-badge"}>{src?<img src={src} alt={`Escudo de ${name}`}/>:<span>{name?.slice(0,2)?.toUpperCase()||"BR"}</span>}</span>;
+}
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -18,6 +60,7 @@ export default function App() {
   const [bids, setBids] = useState([]);
   const [roster, setRoster] = useState([]);
   const [name, setName] = useState("");
+  const [clubName, setClubName] = useState("Seleção Brasileira");
   const [roomCode, setRoomCode] = useState("");
   const [budget, setBudget] = useState("1000");
   const [limit, setLimit] = useState("250");
@@ -66,7 +109,7 @@ export default function App() {
     if (!supabase) return;
     const [r, ps, l, rs] = await Promise.all([
       supabase.from("rooms").select("*").eq("id", roomId).single(),
-      supabase.from("participants").select("id,display_name,is_host,budget,spent,connected,created_at").eq("room_id", roomId).order("created_at"),
+      supabase.from("participants").select("id,display_name,is_host,budget,spent,connected,created_at,club_name,club_wiki_title").eq("room_id", roomId).order("created_at"),
       supabase.from("auction_lots").select("*").eq("room_id", roomId).eq("status","open").maybeSingle(),
       supabase.from("roster").select("id,player_name,position,winning_bid,participant_id").eq("room_id", roomId)
     ]);
@@ -122,25 +165,32 @@ export default function App() {
 
   async function createRoom() {
     if (!name.trim()) return setMessage("Informe seu nome.");
-    const {data: auth} = await supabase.auth.getUser();
-    const result = await runRpc("create_auction_room", {
-      p_name: name.trim(), p_budget: Number(budget), p_increment: Number(increment),
-      p_player_limit: Number(limit)
-    }, (d) => {
-      const p = {room_id:d.room_id, participant_id:d.participant_id, display_name:name.trim()};
-      localStorage.setItem("ldc_profile", JSON.stringify(p)); setProfile(p);
-      setRoomCode(d.room_code); loadRoom(d.room_id, d.participant_id);
-    });
+    const selected = CLUBS.find(c=>c.name===clubName);
+    if (!selected) return setMessage("Escolha seu clube ou a Seleção Brasileira.");
+    setBusy(true); setMessage("");
+    const {data,error} = await supabase.rpc("create_auction_room",{p_name:name.trim(),p_budget:Number(budget),p_increment:Number(increment),p_player_limit:Number(limit)});
+    if(error){setBusy(false);return setMessage(errText(error));}
+    const {error:clubError}=await supabase.rpc("set_my_club",{p_club_name:selected.name,p_club_wiki_title:selected.wiki});
+    setBusy(false);
+    if(clubError)return setMessage("Sala criada, mas não foi possível salvar o clube: "+errText(clubError));
+    const p={room_id:data.room_id,participant_id:data.participant_id,display_name:name.trim()};
+    localStorage.setItem("ldc_profile",JSON.stringify(p));setProfile(p);setRoomCode(data.room_code);
+    await loadRoom(data.room_id,data.participant_id);
   }
 
   async function joinRoom() {
     if (!name.trim() || !roomCode.trim()) return setMessage("Informe seu nome e o código da sala.");
-    const {data, error} = await runRpc("join_auction_room", {p_code:roomCode.trim().toUpperCase(), p_name:name.trim(), p_budget:Number(budget), p_limit:Number(limit)});
-    if (!error) {
-      const p = {room_id:data.room_id, participant_id:data.participant_id, display_name:name.trim()};
-      localStorage.setItem("ldc_profile", JSON.stringify(p)); setProfile(p);
-      await loadRoom(data.room_id, data.participant_id);
-    }
+    const selected=CLUBS.find(c=>c.name===clubName);
+    if(!selected)return setMessage("Escolha seu clube ou a Seleção Brasileira.");
+    setBusy(true);setMessage("");
+    const {data,error}=await supabase.rpc("join_auction_room",{p_code:roomCode.trim().toUpperCase(),p_name:name.trim(),p_budget:Number(budget),p_limit:Number(limit)});
+    if(error){setBusy(false);return setMessage(errText(error));}
+    const {error:clubError}=await supabase.rpc("set_my_club",{p_club_name:selected.name,p_club_wiki_title:selected.wiki});
+    setBusy(false);
+    if(clubError)return setMessage("Entrada realizada, mas não foi possível salvar o clube: "+errText(clubError));
+    const p={room_id:data.room_id,participant_id:data.participant_id,display_name:name.trim()};
+    localStorage.setItem("ldc_profile",JSON.stringify(p));setProfile(p);
+    await loadRoom(data.room_id,data.participant_id);
   }
 
   async function setMyLimit() {
@@ -169,7 +219,7 @@ export default function App() {
 
   if (!session) return <main className="shell"><section className="hero"><div className="logo"><Gavel/></div><p className="eyebrow">JOGO MULTIPLAYER • SALAS PRIVADAS</p><h1>LEILÃO DOS <em>CRAQUES</em></h1><p>Crie uma sala para jogar com Miguel ou entre usando o código recebido.</p><button className="primary" disabled={busy} onClick={signIn}>Entrar no jogo</button></section></main>;
 
-  if (!profile || !room) return <main className="shell"><header className="top"><div className="brand"><Gavel/> LEILÃO DOS CRAQUES</div><span className="pill"><Radio size={14}/> Conexão segura</span></header><section className="join-grid"><article className="panel"><p className="eyebrow">IDENTIFICAÇÃO</p><h2>Quem vai jogar?</h2><label>Seu nome</label><input value={name} onChange={e=>setName(e.target.value)} placeholder="Ex.: Bruno ou Miguel"/><label>Orçamento inicial (R$)</label><input type="number" min="1" value={budget} onChange={e=>setBudget(e.target.value)}/><label>Seu limite máximo por jogador (R$)</label><input type="number" min="1" value={limit} onChange={e=>setLimit(e.target.value)}/><small>Esse limite é privado. O outro participante não consegue consultá-lo.</small></article><article className="panel"><p className="eyebrow">NOVA DISPUTA</p><h2>Criar sala</h2><p>Você será o administrador da sala e poderá abrir os jogadores para leilão.</p><button className="primary" disabled={busy} onClick={createRoom}><Plus size={17}/> Criar sala privada</button><div className="separator">OU ENTRE EM UMA SALA</div><label>Código de acesso</label><input value={roomCode} onChange={e=>setRoomCode(e.target.value.toUpperCase())} placeholder="Ex.: A7K9P2"/><button className="secondary" disabled={busy} onClick={joinRoom}>Entrar na sala</button></article></section>{message && <p className="message">{message}</p>}</main>;
+  if (!profile || !room) return <main className="shell"><header className="top"><div className="brand"><Gavel/> LEILÃO DOS CRAQUES</div><span className="pill"><Radio size={14}/> Conexão segura</span></header><section className="join-grid"><article className="panel"><p className="eyebrow">IDENTIFICAÇÃO</p><h2>Quem vai jogar?</h2><label>Seu nome</label><input value={name} onChange={e=>setName(e.target.value)} placeholder="Ex.: Bruno ou Miguel"/><label>Clube que você vai representar</label><select value={clubName} onChange={e=>setClubName(e.target.value)}>{["Seleção","Série A","Série A/B","Tradicional"].map(g=><optgroup key={g} label={g}>{CLUBS.filter(c=>c.group===g).map(c=><option key={c.name} value={c.name}>{c.name}</option>)}</optgroup>)}</select><div className="club-preview"><ClubBadge wiki={CLUBS.find(c=>c.name===clubName)?.wiki} name={clubName} large/><span>{clubName}</span></div><label>Orçamento inicial (R$)</label><input type="number" min="1" value={budget} onChange={e=>setBudget(e.target.value)}/><label>Seu limite máximo por jogador (R$)</label><input type="number" min="1" value={limit} onChange={e=>setLimit(e.target.value)}/><small>Esse limite é privado. O outro participante não consegue consultá-lo.</small></article><article className="panel"><p className="eyebrow">NOVA DISPUTA</p><h2>Criar sala</h2><p>Você será o administrador da sala e poderá abrir os jogadores para leilão.</p><button className="primary" disabled={busy} onClick={createRoom}><Plus size={17}/> Criar sala privada</button><div className="separator">OU ENTRE EM UMA SALA</div><label>Código de acesso</label><input value={roomCode} onChange={e=>setRoomCode(e.target.value.toUpperCase())} placeholder="Ex.: A7K9P2"/><button className="secondary" disabled={busy} onClick={joinRoom}>Entrar na sala</button></article></section>{message && <p className="message">{message}</p>}</main>;
 
   return <main className="shell">
     <header className="top"><div className="brand"><Gavel/> LEILÃO DOS CRAQUES</div><div className="top-right"><span className="pill"><Radio size={14}/> Ao vivo</span><button className="icon-button" onClick={logout} title="Sair"><LogOut size={17}/></button></div></header>
@@ -189,7 +239,7 @@ export default function App() {
         {isHost && <article className="panel draw-panel"><p className="eyebrow">CONTROLE DO LEILOEIRO</p><h3>Próximo lote automático</h3><p>O sistema sorteia um craque ainda não utilizado, priorizando as posições que faltam para completar a formação 4-4-2.</p><div className="draw-note"><Trophy size={18}/><span>Jogador, posição, nacionalidade e avaliação serão exibidos para os dois participantes.</span></div><button className="primary" disabled={busy || participants.length < 2 || !!lot} onClick={openLot}><Gavel size={17}/> Sortear próximo jogador</button></article>}
       </div>
       <aside className="side-col">
-        <article className="panel"><p className="eyebrow">PARTICIPANTES</p>{participants.map(p=><div className="person" key={p.id}><div className="avatar">{p.display_name.slice(0,1).toUpperCase()}</div><div className="person-info"><b>{p.display_name}</b><small>{p.is_host?"Organizador":"Participante"}</small><small>Saldo: {money(Number(p.budget)-Number(p.spent))}</small></div><span className={`dot ${p.connected?"on":""}`}/></div>)}</article>
+        <article className="panel"><p className="eyebrow">PARTICIPANTES</p>{participants.map(p=><div className="person" key={p.id}><ClubBadge wiki={p.club_wiki_title} name={p.club_name}/><div className="avatar">{p.display_name.slice(0,1).toUpperCase()}</div><div className="person-info"><b>{p.display_name}</b><small>{p.club_name||"Clube não selecionado"}</small><small>{p.is_host?"Organizador":"Participante"}</small><small>Saldo: {money(Number(p.budget)-Number(p.spent))}</small></div><span className={`dot ${p.connected?"on":""}`}/></div>)}</article>
         <article className="panel"><p className="eyebrow">SEU CAIXA</p><div className="cash"><Wallet/><div><small>Orçamento inicial</small><b>{money(participant?.budget)}</b></div></div><div className="finance-grid"><div><small>Total investido</small><b>{money(mySpent)}</b></div><div><small>Saldo disponível</small><b className="balance">{money(myBalance)}</b></div></div><label>Seu teto secreto por jogador (R$)</label><input type="number" min="1" max={myBalance} value={limit} onChange={e=>setLimit(e.target.value)}/><button className="secondary full" disabled={busy} onClick={setMyLimit}>Atualizar meu limite privado</button><small>Limite atual: {money(myPrivate?.max_bid)} — visível somente nesta tela.</small></article>
         <article className="panel"><p className="eyebrow">ELENCO ARREMATADO</p>{roster.length ? roster.map(r=><div className="bid-row" key={r.id}><span>{r.player_name}<small>{r.position} • {participants.find(p=>p.id===r.participant_id)?.display_name || "Participante"}</small></span><b>{money(r.winning_bid)}</b></div>) : <small>Nenhum jogador arrematado ainda.</small>}</article>
       </aside>
