@@ -144,10 +144,20 @@ export default function App() {
     if (!lot?.id) { setPlayerPhoto(""); return; }
     let cancelled = false;
     const title = lot.wiki_title || lot.player_name;
-    fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`)
-      .then(r => r.ok ? r.json() : Promise.reject(new Error("Imagem indisponível")))
-      .then(data => { if (!cancelled) setPlayerPhoto(data?.thumbnail?.source || data?.originalimage?.source || ""); })
-      .catch(() => { if (!cancelled) setPlayerPhoto(""); });
+    const lookup = async () => {
+      const endpoints = ["https://pt.wikipedia.org/api/rest_v1/page/summary/", "https://en.wikipedia.org/api/rest_v1/page/summary/"];
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint + encodeURIComponent(title));
+          if (!response.ok) continue;
+          const data = await response.json();
+          const image = data?.thumbnail?.source || data?.originalimage?.source;
+          if (image) { if (!cancelled) setPlayerPhoto(image); return; }
+        } catch {}
+      }
+      if (!cancelled) setPlayerPhoto("");
+    };
+    lookup();
     return () => { cancelled = true; };
   }, [lot?.id, lot?.wiki_title, lot?.player_name]);
 
