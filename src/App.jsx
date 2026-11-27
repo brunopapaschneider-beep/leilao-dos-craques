@@ -22,9 +22,7 @@ export default function App() {
   const [budget, setBudget] = useState("1000");
   const [limit, setLimit] = useState("250");
   const [increment, setIncrement] = useState("1");
-  const [playerName, setPlayerName] = useState("");
-  const [position, setPosition] = useState("Meio-campo");
-  const [startingBid, setStartingBid] = useState("1");
+  const [playerPhoto, setPlayerPhoto] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [myPrivate, setMyPrivate] = useState(null);
@@ -34,6 +32,8 @@ export default function App() {
   const highest = bids.length ? bids[bids.length - 1] : null;
   const nextBid = lot ? (lot.current_winner ? Number(lot.current_bid) + Number(room?.increment || increment || 1) : Number(lot.starting_bid)) : 0;
   const myTop = highest?.participant_id === participant?.id;
+  const mySpent = Number(participant?.spent || 0);
+  const myBalance = Math.max(0, Number(participant?.budget || 0) - mySpent);
 
   useEffect(() => {
     if (!supabase) return;
@@ -93,6 +93,17 @@ export default function App() {
   }, [profile?.room_id, profile?.participant_id]);
 
   useEffect(() => {
+    if (!lot?.id) { setPlayerPhoto(""); return; }
+    let cancelled = false;
+    const title = lot.wiki_title || lot.player_name;
+    fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error("Imagem indisponível")))
+      .then(data => { if (!cancelled) setPlayerPhoto(data?.thumbnail?.source || data?.originalimage?.source || ""); })
+      .catch(() => { if (!cancelled) setPlayerPhoto(""); });
+    return () => { cancelled = true; };
+  }, [lot?.id, lot?.wiki_title, lot?.player_name]);
+
+  useEffect(() => {
     if (!supabase || !lot?.id) return;
     const channel = supabase.channel(`lot-${lot.id}`)
       .on("postgres_changes", {event:"*", schema:"public", table:"bids", filter:`lot_id=eq.${lot.id}`}, () => loadRoom(profile.room_id, profile.participant_id))
@@ -138,9 +149,7 @@ export default function App() {
   }
 
   async function openLot() {
-    if (!playerName.trim()) return setMessage("Informe o nome do jogador.");
-    await runRpc("open_auction_lot", {p_player_name:playerName.trim(), p_position:position, p_starting_bid:Number(startingBid)});
-    setPlayerName("");
+    await runRpc("open_random_auction_lot", {});
   }
 
   async function bid() {
@@ -168,7 +177,7 @@ export default function App() {
     <section className="layout">
       <div className="main-col">
         <article className="auction panel">
-          <div className="auction-head"><div><p className="eyebrow">DISPUTA ATUAL</p><h2>{lot?.player_name || "Aguardando jogador"}</h2><p>{lot ? `${lot.position} • ${lot.status === "open" ? "Leilão aberto" : lot.status}` : "O administrador pode abrir o próximo lote."}</p></div><div className="hammer"><Gavel/></div></div>
+          <div className="auction-head"><div className="player-heading"><p className="eyebrow">DISPUTA ATUAL</p><h2>{lot?.player_name || "Aguardando jogador"}</h2><p>{lot ? `${lot.position} • ${lot.nationality || "Craque internacional"} • ${lot.status === "open" ? "Leilão aberto" : lot.status}` : "O administrador pode sortear o próximo craque."}{lot?.rating ? ` • Nota ${lot.rating}/100` : ""}</p></div>{lot ? <div className="player-photo">{playerPhoto ? <img src={playerPhoto} alt={lot.player_name} /> : <div className="player-placeholder"><Trophy size={30}/><span>{lot.player_name.slice(0,1)}</span></div>}</div> : <div className="hammer"><Gavel/></div>}</div>
           {lot ? <>
             <div className="price">{money(lot.current_bid || lot.starting_bid)}</div>
             <div className="muted">Maior lance público</div>
@@ -177,12 +186,12 @@ export default function App() {
             <h3>Histórico de lances</h3><div className="bid-list">{bids.slice().reverse().map((b,i)=><div className="bid-row" key={b.id}><span>{participants.find(p=>p.id===b.participant_id)?.display_name || "Participante"}</span><b>{money(b.amount)}</b></div>)}{!bids.length && <small>Nenhum lance registrado.</small>}</div>
           </> : <div className="empty"><Trophy size={28}/><p>Quando o primeiro jogador for colocado em disputa, ele aparecerá aqui.</p></div>}
         </article>
-        {isHost && <article className="panel"><p className="eyebrow">CONTROLE DO LEILOEIRO</p><h3>Abrir jogador para disputa</h3><div className="form-grid"><div><label>Nome do jogador</label><input value={playerName} onChange={e=>setPlayerName(e.target.value)} placeholder="Ex.: Pelé"/></div><div><label>Posição</label><select value={position} onChange={e=>setPosition(e.target.value)}>{["Goleiro","Lateral-direito","Zagueiro","Lateral-esquerdo","Volante","Meio-campo","Ponta","Atacante"].map(x=><option>{x}</option>)}</select></div><div><label>Lance inicial (R$)</label><input type="number" min="1" value={startingBid} onChange={e=>setStartingBid(e.target.value)}/></div></div><button className="primary" disabled={busy || !participants.length || !!lot} onClick={openLot}>Colocar jogador em leilão</button></article>}
+        {isHost && <article className="panel draw-panel"><p className="eyebrow">CONTROLE DO LEILOEIRO</p><h3>Próximo lote automático</h3><p>O sistema sorteia um craque ainda não utilizado, priorizando as posições que faltam para completar a formação 4-4-2.</p><div className="draw-note"><Trophy size={18}/><span>Jogador, posição, nacionalidade e avaliação serão exibidos para os dois participantes.</span></div><button className="primary" disabled={busy || participants.length < 2 || !!lot} onClick={openLot}><Gavel size={17}/> Sortear próximo jogador</button></article>}
       </div>
       <aside className="side-col">
-        <article className="panel"><p className="eyebrow">PARTICIPANTES</p>{participants.map(p=><div className="person" key={p.id}><div className="avatar">{p.display_name.slice(0,1).toUpperCase()}</div><div><b>{p.display_name}</b><small>{p.is_host?"Organizador":"Participante"}</small></div><span className={`dot ${p.connected?"on":""}`}/></div>)}</article>
-        <article className="panel"><p className="eyebrow">SEU CAIXA</p><div className="cash"><Wallet/><div><small>Orçamento inicial</small><b>{money(participant?.budget)}</b></div></div><label>Seu teto secreto por jogador (R$)</label><input type="number" min="1" value={limit} onChange={e=>setLimit(e.target.value)}/><button className="secondary full" disabled={busy} onClick={setMyLimit}>Atualizar meu limite privado</button><small>Limite atual: {money(myPrivate?.max_bid)} — visível somente nesta tela.</small></article>
-        <article className="panel"><p className="eyebrow">ELENCO ARREMATADO</p>{roster.length ? roster.map(r=><div className="bid-row" key={r.id}><span>{r.player_name}<small>{r.position}</small></span><b>{money(r.winning_bid)}</b></div>) : <small>Nenhum jogador arrematado ainda.</small>}</article>
+        <article className="panel"><p className="eyebrow">PARTICIPANTES</p>{participants.map(p=><div className="person" key={p.id}><div className="avatar">{p.display_name.slice(0,1).toUpperCase()}</div><div className="person-info"><b>{p.display_name}</b><small>{p.is_host?"Organizador":"Participante"}</small><small>Saldo: {money(Number(p.budget)-Number(p.spent))}</small></div><span className={`dot ${p.connected?"on":""}`}/></div>)}</article>
+        <article className="panel"><p className="eyebrow">SEU CAIXA</p><div className="cash"><Wallet/><div><small>Orçamento inicial</small><b>{money(participant?.budget)}</b></div></div><div className="finance-grid"><div><small>Total investido</small><b>{money(mySpent)}</b></div><div><small>Saldo disponível</small><b className="balance">{money(myBalance)}</b></div></div><label>Seu teto secreto por jogador (R$)</label><input type="number" min="1" max={myBalance} value={limit} onChange={e=>setLimit(e.target.value)}/><button className="secondary full" disabled={busy} onClick={setMyLimit}>Atualizar meu limite privado</button><small>Limite atual: {money(myPrivate?.max_bid)} — visível somente nesta tela.</small></article>
+        <article className="panel"><p className="eyebrow">ELENCO ARREMATADO</p>{roster.length ? roster.map(r=><div className="bid-row" key={r.id}><span>{r.player_name}<small>{r.position} • {participants.find(p=>p.id===r.participant_id)?.display_name || "Participante"}</small></span><b>{money(r.winning_bid)}</b></div>) : <small>Nenhum jogador arrematado ainda.</small>}</article>
       </aside>
     </section>
     {message && <p className="message">{message}</p>}
