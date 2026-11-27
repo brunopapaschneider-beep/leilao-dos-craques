@@ -54,6 +54,12 @@ function ClubBadge({wiki,name,large=false}) {
  return <span className={large?"club-badge club-badge-large":"club-badge"}>{src?<img src={src} alt={`Escudo de ${name}`}/>:<span>{name?.slice(0,2)?.toUpperCase()||"BR"}</span>}</span>;
 }
 
+
+const CLUB_PALETTE = {
+  "Seleção Brasileira":["#F5C400","#168A45"],"Flamengo":["#C8102E","#111111"],"Palmeiras":["#087A42","#FFFFFF"],"Corinthians":["#F5F5F5","#171717"],"São Paulo":["#D71920","#171717"],"Santos":["#171717","#FFFFFF"],"Grêmio":["#1595D3","#111111"],"Internacional":["#D71920","#FFFFFF"],"Atlético-MG":["#171717","#FFFFFF"],"Cruzeiro":["#0756A5","#FFFFFF"],"Botafogo":["#171717","#FFFFFF"],"Fluminense":["#7A1732","#16834A"],"Vasco":["#171717","#FFFFFF"],"Bahia":["#0879C9","#D71920"],"Vitória":["#D71920","#171717"],"Athletico-PR":["#D71920","#171717"],"Fortaleza":["#0756A5","#D71920"],"Ceará":["#171717","#FFFFFF"],"Sport":["#D71920","#171717"],"Coritiba":["#087A42","#FFFFFF"],"Goiás":["#087A42","#FFFFFF"],"América-MG":["#087A42","#171717"],"Chapecoense":["#168A45","#FFFFFF"],"Criciúma":["#F4C400","#171717"],"Ponte Preta":["#171717","#FFFFFF"],"Guarani":["#087A42","#FFFFFF"],"Santa Cruz":["#171717","#FFFFFF"],"Náutico":["#D71920","#FFFFFF"],"Remo":["#0756A5","#FFFFFF"],"Paysandu":["#0756A5","#FFFFFF"],"Vila Nova":["#D71920","#FFFFFF"],"ABC":["#171717","#FFFFFF"],"Figueirense":["#171717","#FFFFFF"]
+};
+const clubColors = name => CLUB_PALETTE[name] || ["#245A80","#D6AD5C"];
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -341,6 +347,7 @@ export default function App() {
   return <main className="shell">
     <header className="top"><div className="brand"><Gavel/> LEILÃO DOS CRAQUES</div><div className="top-right"><span className="pill"><Radio size={14}/> Ao vivo</span><button className="icon-button" onClick={logout} title="Sair"><LogOut size={17}/></button></div></header>
     <section className="room-banner"><div><p className="eyebrow">SALA PRIVADA</p><h2>Código: <strong>{room.room_code}</strong></h2><p>Compartilhe este código com o outro computador.</p></div><div className="room-stat"><Users/><b>{participants.length}/2</b><small>participantes</small></div></section>
+    <section className="roster-duel" aria-label="Elencos dos participantes">{participants.map((p,index)=>{const teamRoster=roster.filter(r=>r.participant_id===p.id);const invested=teamRoster.reduce((sum,r)=>sum+Number(r.winning_bid||0),0);const balance=Math.max(0,Number(p.budget||0)-invested);const colors=clubColors(p.club_name);return <article className="roster-team" key={p.id} style={{"--club-primary":colors[0],"--club-secondary":colors[1]}}><header className="roster-team-head"><div className="roster-team-identity"><ClubBadge wiki={p.club_wiki_title} name={p.club_name} large/><div><p className="eyebrow">JOGADOR {index+1}</p><h2>{p.display_name}</h2><span>{p.club_name||"Clube não selecionado"}</span></div></div><strong className="roster-count">{teamRoster.length}<small>/23</small></strong></header><div className="roster-finance"><div><small>Investido</small><b>{money(invested)}</b></div><div><small>Saldo</small><b>{money(balance)}</b></div></div><div className="roster-list">{teamRoster.length?teamRoster.map((r,i)=><div className="roster-player" key={r.id}><span className="roster-number">{String(i+1).padStart(2,"0")}</span><span className="roster-player-info"><b>{r.player_name}</b><small>{r.position}</small></span><strong>{money(r.winning_bid)}</strong></div>):<div className="roster-empty">Nenhum jogador contratado ainda.</div>}</div></article>;})}</section>
     <section className="layout">
       <div className="main-col">
         <article className="auction panel">
@@ -383,7 +390,7 @@ export default function App() {
       <aside className="side-col">
         <article className="panel"><p className="eyebrow">PARTICIPANTES</p>{participants.map(p=><div className="person" key={p.id}><ClubBadge wiki={p.club_wiki_title} name={p.club_name}/><div className="avatar">{p.display_name.slice(0,1).toUpperCase()}</div><div className="person-info"><b>{p.display_name}</b><small>{p.club_name||"Clube não selecionado"}</small><small>{p.is_host?"Organizador":"Participante"}</small><small>Saldo: {money(Math.max(0,Number(p.budget)-Number(p.spent)))}</small><small>Elenco: {rosterCounts.find(x=>x.id===p.id)?.rosterCount || 0}/23</small>{p.id===participant?.id && <div className="my-club-editor"><select value={clubDraft} onChange={e=>setClubDraft(e.target.value)}>{SORTED_CLUBS.map(c=><option key={c.name} value={c.name}>{c.name}</option>)}</select><button className="secondary club-save" disabled={busy} onClick={saveMyClub}>Escolher meu clube</button></div>}</div><span className={`dot ${p.connected?"on":""}`}/></div>)}</article>
         <article className="panel"><p className="eyebrow">SEU CAIXA</p><div className="cash"><Wallet/><div><small>Orçamento inicial</small><b>{money(participant?.budget)}</b></div></div><div className="finance-grid"><div><small>Total investido</small><b>{money(mySpent)}</b></div><div><small>Saldo disponível</small><b className="balance">{money(myBalance)}</b></div></div><small>Máximo privado atual: {money(myPrivate?.max_bid)}. Defina um valor diferente para cada jogador em disputa.</small></article>
-        <article className="panel"><p className="eyebrow">ELENCO ARREMATADO</p>{roster.length ? roster.map(r=><div className="bid-row" key={r.id}><span>{r.player_name}<small>{r.position} • {participants.find(p=>p.id===r.participant_id)?.display_name || "Participante"}</small></span><b>{money(r.winning_bid)}</b></div>) : <small>Nenhum jogador arrematado ainda.</small>}</article>
+        
       </aside>
     </section>
     {message && <p className="message">{message}</p>}
