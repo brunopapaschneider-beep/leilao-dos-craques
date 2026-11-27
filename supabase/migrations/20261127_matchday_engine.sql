@@ -55,7 +55,7 @@ begin
         raise exception 'A melhor de 3 só é liberada depois de uma vitória de cada participante.';
       end if;
       v_series := jsonb_build_object(
-        'active', true, 'game', 1, 'wins', jsonb_build_object(v_left_id,0,v_right_id,0),
+        'id', gen_random_uuid()::text, 'active', true, 'game', 1, 'wins', jsonb_build_object(v_left_id,0,v_right_id,0),
         'participants', jsonb_build_array(v_left_id,v_right_id)
       );
     end if;
