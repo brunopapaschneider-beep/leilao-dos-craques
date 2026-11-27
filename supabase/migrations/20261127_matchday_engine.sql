@@ -72,12 +72,18 @@ begin
   end if;
 
   update public.rooms
-     set match_state = jsonb_set(p_state, '{series}', coalesce(v_series,'null'::jsonb), true),
+     set match_state = jsonb_set(
+           jsonb_set(p_state, '{series}', coalesce(v_series,'null'::jsonb), true),
+           '{ready}', jsonb_build_object(v_left_id,false,v_right_id,false), true
+         ),
          match_result = null,
          match_series = v_series
    where id = v_room.id;
 
-  return jsonb_set(p_state, '{series}', coalesce(v_series,'null'::jsonb), true);
+  return jsonb_set(
+    jsonb_set(p_state, '{series}', coalesce(v_series,'null'::jsonb), true),
+    '{ready}', jsonb_build_object(v_left_id,false,v_right_id,false), true
+  );
 end;
 $$;
 
@@ -117,6 +123,7 @@ begin
   end if;
 
   v_state := jsonb_set(v_state, array['teams',p_team_id::text], p_team, true);
+  v_state := jsonb_set(v_state, array['ready',p_team_id::text], 'false'::jsonb, true);
   update public.rooms set match_state=v_state where id=v_room.id;
   return v_state;
 end;
@@ -139,6 +146,9 @@ declare
   v_wins jsonb;
   v_winner text;
   v_game integer;
+  v_left_id text;
+  v_right_id text;
+  v_next_state jsonb;
   v_left text;
   v_right text;
 begin
@@ -152,15 +162,22 @@ begin
      or coalesce((v_old->>'paused')::boolean,false) is not true then
     raise exception 'A partida não está em uma pausa válida.';
   end if;
+  select id::text into v_left_id from public.participants where room_id=v_part.room_id order by created_at limit 1;
+  select id::text into v_right_id from public.participants where room_id=v_part.room_id order by created_at desc limit 1;
+  if coalesce((v_old->'ready'->>v_left_id)::boolean,false) is not true
+     or coalesce((v_old->'ready'->>v_right_id)::boolean,false) is not true then
+    raise exception 'Os dois participantes precisam confirmar PRONTO antes de avançar.';
+  end if;
   v_new_minute := coalesce((v_old->>'minute')::integer,0) + 15;
+  v_next_state := jsonb_set(p_state, '{ready}', jsonb_build_object(v_left_id,false,v_right_id,false), true);
   if coalesce((p_state->>'minute')::integer,-1) <> v_new_minute then
     raise exception 'A partida deve avançar exatamente 15 minutos.';
   end if;
   if v_new_minute > 90 then raise exception 'A partida já chegou ao fim.'; end if;
 
   if v_new_minute < 90 then
-    update public.rooms set match_state=p_state where id=v_room.id;
-    return p_state;
+    update public.rooms set match_state=v_next_state where id=v_room.id;
+    return v_next_state;
   end if;
 
   v_result := p_state->'result';
@@ -186,14 +203,40 @@ begin
   end if;
 
   update public.rooms
-     set match_state=p_state,
+     set match_state=v_next_state,
          match_result=v_result,
          match_history=v_history,
          match_series=v_series
    where id=v_room.id;
-  return p_state;
+  return v_next_state;
 end;
-$$;
+$;
+
+create or replace function public.set_room_match_ready(p_ready boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $
+declare
+  v_part public.participants;
+  v_room public.rooms;
+  v_state jsonb;
+begin
+  if auth.uid() is null then raise exception 'Faça login para confirmar presença.'; end if;
+  select * into v_part from public.participants where user_id=auth.uid() order by created_at desc limit 1;
+  if not found then raise exception 'Participante não encontrado.'; end if;
+  select * into v_room from public.rooms where id=v_part.room_id for update;
+  v_state := v_room.match_state;
+  if v_state is null or coalesce(v_state->>'status','') <> 'live'
+     or coalesce((v_state->>'paused')::boolean,false) is not true then
+    raise exception 'A confirmação só pode ser feita durante uma pausa.';
+  end if;
+  v_state := jsonb_set(v_state,array['ready',v_part.id::text],to_jsonb(p_ready),true);
+  update public.rooms set match_state=v_state where id=v_room.id;
+  return v_state;
+end;
+$;
 
 revoke all on function public.start_room_match(jsonb,boolean) from public;
 revoke all on function public.update_room_match_team(uuid,jsonb) from public;
