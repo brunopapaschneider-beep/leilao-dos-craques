@@ -73,6 +73,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [myPrivate, setMyPrivate] = useState(null);
+  const [myProxy, setMyProxy] = useState(null);
 
   const participant = useMemo(() => participants.find(p => p.id === profile?.participant_id), [participants, profile]);
   const isHost = participant?.is_host === true;
@@ -132,6 +133,10 @@ export default function App() {
     const {data: priv} = await supabase.rpc("get_my_private_limit");
     setMyPrivate(priv == null ? null : {max_bid:Number(priv)});
     if (priv != null) setLimit(String(priv));
+    if (l.data) {
+      const {data: proxy} = await supabase.rpc("get_my_lot_proxy_setting", {p_lot_id:l.data.id});
+      setMyProxy(proxy?.configured ? {lot_id:l.data.id, max_bid:Number(proxy.max_bid), increment:Number(proxy.increment)} : null);
+    } else setMyProxy(null);
   }
 
   useEffect(() => {
@@ -248,12 +253,13 @@ export default function App() {
     setBusy(false);
     if (error) return setMessage(errText(error));
     setMyPrivate({max_bid:Number(limit)});
-    if (data?.resolved) {
-      setMessage(data.you_won
-        ? "Disputa automática concluída: você venceu pelo menor valor necessário."
-        : "Disputa automática concluída: o adversário venceu.");
+    setMyProxy({lot_id:lot.id, max_bid:Number(limit), increment:Number(increment)});
+    if (data?.resolved && data?.covered) {
+      setMessage(data.you_won ? "Disputa automática concluída: você venceu pelo menor valor necessário." : "O adversário venceu automaticamente pelo menor valor necessário.");
+    } else if (data?.resolved) {
+      setMessage("Nenhum dos limites cobriu a disputa. O lote foi encerrado sem venda.");
     } else {
-      setMessage("Seu máximo e incremento foram salvos em sigilo. Aguardando o adversário configurar os dele.");
+      setMessage("Máximo e incremento salvos em sigilo. A disputa será liquidada automaticamente quando o adversário salvar os dele.");
     }
     if (profile) await loadRoom(profile.room_id, profile.participant_id);
   }
@@ -299,8 +305,8 @@ export default function App() {
               <div><label>Incremento dos meus lances (R$)</label><input type="number" min="1" step="1" value={increment} onChange={e=>setIncrement(e.target.value)}/></div>
               <button className="secondary" disabled={busy || !limit || Number(limit) <= 0 || !Number.isInteger(Number(limit)) || Number(limit) > myBalance || Number(increment) < 1 || !Number.isInteger(Number(increment))} onClick={setMyLimit}>Salvar meu máximo</button>
             </div>
-            <div className="bid-actions"><input aria-label="Valor do lance em reais" type="number" min={nextBid} max={Math.min(myBalance,Number(myPrivate?.max_bid ?? 0))} step="1" value={manualBid} onChange={e=>setManualBid(e.target.value)} placeholder={`Mínimo ${nextBid}`} /><button className="primary bid-button" disabled={busy || lot.status!=="open" || myTop || !Number.isInteger(chosenBid) || chosenBid < nextBid || chosenBid > myBalance || chosenBid > Number(myPrivate?.max_bid ?? 0)} onClick={bid}>Dar lance de {money(chosenBid)}</button><button className="secondary" disabled={busy || lot.status!=="open"} onClick={pass}>Passar</button></div>
-            <div className="notice small"><ShieldCheck size={16}/> Seu teto é secreto e validado no banco de dados. O adversário vê apenas o maior lance.</div>
+            <div className="notice small"><ShieldCheck size={16}/> Configure seu máximo e incremento e clique em “Salvar meu máximo”. Quando os dois participantes salvarem, o servidor calcula a disputa, registra o vencedor e encerra o lote automaticamente. Os limites permanecem privados.</div>
+            {myProxy?.lot_id === lot.id ? <div className="draw-note"><ShieldCheck size={18}/><span>Seu máximo e incremento estão salvos. Aguardando o outro participante.</span></div> : <div className="draw-note"><Gavel size={18}/><span>Você ainda não configurou seu máximo para este jogador.</span></div>}
             <h3>Histórico de lances</h3><div className="bid-list">{bids.slice().reverse().map((b,i)=><div className="bid-row" key={b.id}><span>{participants.find(p=>p.id===b.participant_id)?.display_name || "Participante"}</span><b>{money(b.amount)}</b></div>)}{!bids.length && <small>Nenhum lance registrado.</small>}</div>
           </> : <div className="empty"><Trophy size={28}/><p>Quando o primeiro jogador for colocado em disputa, ele aparecerá aqui.</p></div>}
         </article>
