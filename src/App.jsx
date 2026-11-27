@@ -76,10 +76,6 @@ export default function App() {
   const [myPrivate, setMyPrivate] = useState(null);
   const [myProxy, setMyProxy] = useState(null);
   const [bidMode, setBidMode] = useState("automatic");
-  const [showMatch, setShowMatch] = useState(false);
-  const [homeTactic, setHomeTactic] = useState("equilibrado");
-  const [awayTactic, setAwayTactic] = useState("equilibrado");
-  const [matchResult, setMatchResult] = useState(null);
 
   const participant = useMemo(() => participants.find(p => p.id === profile?.participant_id), [participants, profile]);
   const isHost = participant?.is_host === true;
@@ -91,56 +87,6 @@ export default function App() {
   const mySpent = Number(participant?.spent || 0);
   const myBalance = Math.max(0, Number(participant?.budget || 0) - mySpent);
   const rosterCounts = useMemo(() => participants.map(p => ({...p, rosterCount: roster.filter(r => r.participant_id === p.id).length, balance: Math.max(0, Number(p.budget || 0) - Number(p.spent || 0))})), [participants, roster]);
-  const matchReady = participants.length === 2 && participants.every(p => roster.filter(r => r.participant_id === p.id).length === 23);
-  const tactics = { equilibrado:{label:"Equilibrado",attack:0,defense:0}, ofensivo:{label:"Ofensivo",attack:7,defense:-4}, defensivo:{label:"Defensivo",attack:-3,defense:7}, contra:{label:"Contra-ataque",attack:4,defense:2}, posse:{label:"Posse de bola",attack:3,defense:1} };
-  function buildStartingEleven(teamRoster) {
-    const needs = [["Goleiro",1],["Lateral-direito",1],["Zagueiro",2],["Lateral-esquerdo",1],["Volante",1],["Meio-campo",3],["Atacante",2]];
-    const used = new Set(); const starters = [];
-    const byRating = (a,b) => Number(b.rating||75)-Number(a.rating||75);
-    for (const [position,count] of needs) {
-      const candidates = teamRoster.filter(p=>p.position===position && !used.has(p.id)).sort(byRating);
-      for (const player of candidates.slice(0,count)) { used.add(player.id); starters.push(player); }
-    }
-    // Se faltarem jogadores em alguma posição, completa os 11 com os melhores
-    // atletas restantes do elenco, sem duplicar ou remover jogadores.
-    if (starters.length < 11) {
-      const remaining = teamRoster.filter(p=>!used.has(p.id)).sort(byRating);
-      for (const player of remaining.slice(0,11-starters.length)) { used.add(player.id); starters.push(player); }
-    }
-    return {starters,bench:teamRoster.filter(p=>!used.has(p.id))};
-  }
-  async function simulateMatch() {
-    if (!isHost) { setMessage("Apenas o organizador pode iniciar a partida."); return; }
-    if (matchResult) { setMessage("Esta partida já foi realizada."); return; }
-    const teams = participants.map(p => ({participant:p,...buildStartingEleven(roster.filter(r=>r.participant_id===p.id))}));
-    if (teams.some(t=>t.starters.length!==11)) { setMessage("Não foi possível montar os 11 titulares. Confira os elencos."); return; }
-    const scoreTeam = (team, opponent, tacticKey, oppTacticKey) => {
-      const avg = team.starters.reduce((sum,p)=>sum+Number(p.rating||75),0)/11;
-      const bench = team.bench.reduce((sum,p)=>sum+Number(p.rating||75),0)/(team.bench.length||1);
-      const oppAvg = opponent.starters.reduce((sum,p)=>sum+Number(p.rating||75),0)/11;
-      const strength = avg*0.78 + bench*0.08 + 10 + tactics[tacticKey].attack - tactics[oppTacticKey].defense*0.35;
-      const expected = Math.max(0.15,Math.min(4.2,1.25+(strength-oppAvg)/22));
-      let goals=0; for(let i=0;i<6;i++) if(Math.random()<expected/6) goals++;
-      return {goals,avg:Math.round(avg),strength:Math.round(strength)};
-    };
-    // O organizador gera o resultado uma única vez; o Supabase o distribui aos dois clientes.
-    const localTactic = team => team.participant.id === participant?.id ? homeTactic : "equilibrado";
-    const homeKey = localTactic(teams[0]), awayKey = localTactic(teams[1]);
-    const h=scoreTeam(teams[0],teams[1],homeKey,awayKey), v=scoreTeam(teams[1],teams[0],awayKey,homeKey);
-    const events=[];
-    [[teams[0],h.goals],[teams[1],v.goals]].forEach(([team,n])=>{
-      const pool=team.starters.filter(p=>p.position==="Atacante"||p.position==="Meio-campo");
-      for(let i=0;i<n;i++) events.push({team:team.participant.display_name,player:pool[Math.floor(Math.random()*pool.length)]?.player_name||"Gol",minute:Math.floor(Math.random()*90)+1});
-    });
-    events.sort((x,y)=>x.minute-y.minute);
-    const result={teams,home:h,away:v,events,winner:h.goals===v.goals?"Empate":h.goals>v.goals?teams[0].participant.display_name:teams[1].participant.display_name};
-    setBusy(true); setMessage("");
-    const {data,error}=await supabase.rpc("save_room_match_result",{p_result:result});
-    setBusy(false);
-    if(error){setMessage(errText(error));return;}
-    setMatchResult(data || result);
-    await loadRoom(profile.room_id,profile.participant_id);
-  }
   const allBudgetsExhausted = participants.length === 2 && rosterCounts.every(p => p.balance <= 0);
   const oneRosterComplete = rosterCounts.some(p => p.rosterCount >= 23);
   const completionReady = !lot && rosterCounts.some(p => p.rosterCount < 23) && (allBudgetsExhausted || oneRosterComplete);
@@ -191,7 +137,6 @@ export default function App() {
     ]);
     if (r.error) { setMessage("Sala não encontrada ou sessão expirada."); return; }
     setRoom(r.data); setParticipants(ps.data || []); setLot(l.data || null); setRoster(rs.data || []);
-    setMatchResult(r.data.match_result || null);
     if (l.data) {
       const {data: bs} = await supabase.from("bids").select("id,lot_id,participant_id,amount,created_at").eq("lot_id", l.data.id).order("amount");
       setBids(bs || []);
