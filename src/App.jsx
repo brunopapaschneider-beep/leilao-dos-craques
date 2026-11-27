@@ -95,9 +95,16 @@ export default function App() {
   function buildStartingEleven(teamRoster) {
     const needs = [["Goleiro",1],["Lateral-direito",1],["Zagueiro",2],["Lateral-esquerdo",1],["Volante",1],["Meio-campo",3],["Atacante",2]];
     const used = new Set(); const starters = [];
+    const byRating = (a,b) => Number(b.rating||75)-Number(a.rating||75);
     for (const [position,count] of needs) {
-      const candidates = teamRoster.filter(p=>p.position===position && !used.has(p.id)).sort((x,y)=>Number(y.rating||75)-Number(x.rating||75));
+      const candidates = teamRoster.filter(p=>p.position===position && !used.has(p.id)).sort(byRating);
       for (const player of candidates.slice(0,count)) { used.add(player.id); starters.push(player); }
+    }
+    // Se faltarem jogadores em alguma posição, completa os 11 com os melhores
+    // atletas restantes do elenco, sem duplicar ou remover jogadores.
+    if (starters.length < 11) {
+      const remaining = teamRoster.filter(p=>!used.has(p.id)).sort(byRating);
+      for (const player of remaining.slice(0,11-starters.length)) { used.add(player.id); starters.push(player); }
     }
     return {starters,bench:teamRoster.filter(p=>!used.has(p.id))};
   }
