@@ -113,7 +113,10 @@ export default function App() {
       let goals=0; for(let i=0;i<6;i++) if(Math.random()<expected/6) goals++;
       return {goals,avg:Math.round(avg),strength:Math.round(strength)};
     };
-    const h=scoreTeam(teams[0],teams[1],homeTactic,awayTactic), v=scoreTeam(teams[1],teams[0],awayTactic,homeTactic);
+    // Cada navegador conhece apenas a estratégia do próprio participante.
+    const localTactic = team => team.participant.id === participant?.id ? homeTactic : "equilibrado";
+    const homeKey = localTactic(teams[0]), awayKey = localTactic(teams[1]);
+    const h=scoreTeam(teams[0],teams[1],homeKey,awayKey), v=scoreTeam(teams[1],teams[0],awayKey,homeKey);
     const events=[];
     [[teams[0],h.goals],[teams[1],v.goals]].forEach(([t,n])=>{const pool=t.starters.filter(p=>p.position==="Atacante"||p.position==="Meio-campo");for(let i=0;i<n;i++)events.push({team:t.participant.display_name,player:pool[Math.floor(Math.random()*pool.length)]?.player_name||"Gol",minute:Math.floor(Math.random()*90)+1});});
     events.sort((x,y)=>x.minute-y.minute);
@@ -415,7 +418,7 @@ export default function App() {
           <p>Os dois elencos estão completos. Monte o confronto no 4-4-2 e inicie a partida.</p>
           <button className="primary" onClick={()=>{setShowMatch(v=>!v);setMatchResult(null);}}><Trophy size={17}/> {showMatch?"Fechar simulação":"Abrir simulação"}</button>
           {showMatch && <div className="match-setup">
-            <div className="grid-two">{participants.map((p,i)=>{const lineup=buildStartingEleven(roster.filter(r=>r.participant_id===p.id));return <div className="panel" key={p.id}><h3>{p.display_name} • 4-4-2</h3><label>Estratégia</label><select value={i===0?homeTactic:awayTactic} onChange={e=>i===0?setHomeTactic(e.target.value):setAwayTactic(e.target.value)}>{Object.entries(tactics).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}</select><b>Time titular</b>{lineup.starters.map((pl,j)=><div className="bid-row" key={pl.id}><span>{j+1}. {pl.player_name}<small>{pl.position}</small></span><b>{pl.rating||75}</b></div>)}<small>Banco: {lineup.bench.length} jogadores</small></div>})}</div>
+            <div className="grid-two">{participants.map((p)=>{const lineup=buildStartingEleven(roster.filter(r=>r.participant_id===p.id));const isMyTeam=p.id===participant?.id;return <div className="panel" key={p.id}><h3>{p.display_name} • 4-4-2</h3>{isMyTeam?<><label>Sua estratégia (privada)</label><select value={homeTactic} onChange={e=>setHomeTactic(e.target.value)}>{Object.entries(tactics).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}</select></>:<><label>Estratégia do adversário</label><p className="private-tactic">🔒 Configuração privada</p></>}<b>Time titular</b>{lineup.starters.map((pl,j)=><div className="bid-row" key={pl.id}><span>{j+1}. {pl.player_name}<small>{pl.position}</small></span><b>{pl.rating||75}</b></div>)}<small>Banco: {lineup.bench.length} jogadores</small></div>})}</div>
             <button className="primary" onClick={simulateMatch}><Trophy size={17}/> Iniciar partida</button>
             {matchResult && <div className="panel match-result"><p className="eyebrow">APITO FINAL</p><h2>{matchResult.teams[0].participant.display_name} {matchResult.home.goals} × {matchResult.away.goals} {matchResult.teams[1].participant.display_name}</h2><h3>{matchResult.winner==="Empate"?"Empate":"Vitória de "+matchResult.winner}</h3><p>Força média: {matchResult.home.avg} × {matchResult.away.avg}</p><b>Gols e eventos</b>{matchResult.events.length?matchResult.events.map((e,i)=><div className="bid-row" key={i}><span>{e.minute}' • {e.player}<small>{e.team}</small></span><b>GOL</b></div>):<p>Partida sem gols.</p>}</div>}
           </div>}
