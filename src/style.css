@@ -118,3 +118,15 @@ button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:12
 .roster-player>strong{font-size:12px;color:#f0c66d;white-space:nowrap}
 .roster-empty{padding:22px 8px;color:#9fb2c2;text-align:center;font-size:12px}
 @media(max-width:760px){.roster-duel{grid-template-columns:1fr}.roster-list{max-height:340px}.roster-team-identity h2{font-size:23px}}
+
+
+.player-profile-meta {
+  display: grid;
+  gap: 5px;
+  margin-top: 9px;
+  color: #a9bfd0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.player-profile-meta p { margin: 0; }
+.player-profile-meta b { color: #e2edf5; font-weight: 700; }
