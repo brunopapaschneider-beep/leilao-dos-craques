@@ -167,41 +167,11 @@ export default function App() {
     return () => { supabase.removeChannel(channel); };
   }, [profile?.room_id, profile?.participant_id]);
 
+  // Exibe somente imagem previamente conferida e cadastrada para este atleta.
+  // Não consulta Wikipedia por nome: homônimos e páginas ambíguas causavam fotos incorretas.
   useEffect(() => {
-    if (!lot?.id) { setPlayerPhoto(""); return; }
-    let cancelled = false;
-    let title = lot.wiki_title || lot.player_name;
-    // Desambiguação explícita para o goleiro brasileiro Dida (Nélson de Jesus Silva).
-    if (lot.player_name === "Dida") title = "Dida (footballer, born 1973)";
-    // Imagem conferida manualmente: Roberto Carlos, ex-lateral da Seleção Brasileira.
-    if (lot.player_name === "Roberto Carlos") {
-      setPlayerPhoto("https://thumb.wikimedia.org/wikipedia/commons/thumb/8/82/Roberto_Carlos.JPG/500px-Roberto_Carlos.JPG");
-      return () => {};
-    }
-    const lookup = async () => {
-      const wikis = ["https://pt.wikipedia.org/w/api.php", "https://en.wikipedia.org/w/api.php"];
-      const searchTitles = [title];
-      for (const searchTitle of searchTitles) {
-        for (const api of wikis) {
-          try {
-            const params = new URLSearchParams({
-              action: "query", format: "json", formatversion: "2",
-              prop: "pageimages", piprop: "thumbnail", pithumbsize: "600",
-              redirects: "1", origin: "*", titles: searchTitle
-            });
-            const response = await fetch(`${api}?${params.toString()}`);
-            if (!response.ok) continue;
-            const data = await response.json();
-            const image = data?.query?.pages?.[0]?.thumbnail?.source;
-            if (image) { if (!cancelled) setPlayerPhoto(image); return; }
-          } catch {}
-        }
-      }
-      if (!cancelled) setPlayerPhoto("");
-    };
-    lookup();
-    return () => { cancelled = true; };
-  }, [lot?.id, lot?.wiki_title, lot?.player_name]);
+    setPlayerPhoto(lot?.image_url || "");
+  }, [lot?.id, lot?.image_url]);
 
   useEffect(() => {
     if (!supabase || !lot?.id) return;
@@ -351,7 +321,7 @@ export default function App() {
     <section className="layout">
       <div className="main-col">
         <article className="auction panel">
-          <div className="auction-head"><div className="player-heading"><p className="eyebrow">DISPUTA ATUAL</p><h2>{lot?.player_name || "Aguardando jogador"}</h2><p>{lot ? `${lot.position} • ${lot.nationality || "Craque internacional"} • ${lot.status === "open" ? "Leilão aberto" : lot.status}` : "O administrador pode sortear o próximo craque."}{lot?.rating ? ` • Nota ${lot.rating}/100` : ""}</p></div>{lot ? <div className="player-photo">{playerPhoto ? <img src={playerPhoto} alt={lot.player_name} /> : <div className="player-placeholder"><Trophy size={30}/><span>{lot.player_name.slice(0,1)}</span></div>}</div> : <div className="hammer"><Gavel/></div>}</div>
+          <div className="auction-head"><div className="player-heading"><p className="eyebrow">DISPUTA ATUAL</p><h2>{lot?.player_name || "Aguardando jogador"}</h2><p>{lot ? `${lot.position} • ${lot.nationality || "Craque internacional"} • ${lot.status === "open" ? "Leilão aberto" : lot.status}` : "O administrador pode sortear o próximo craque."}{lot?.rating ? ` • Nota ${lot.rating}/100` : ""}</p>{lot && <div className="player-profile-meta">{lot.last_club ? <p><b>Último clube:</b> {lot.last_club}{lot.last_club_country ? ` • ${lot.last_club_country}` : ""}{lot.last_club_season ? ` • ${lot.last_club_season}` : ""}</p> : <p><b>Último clube:</b> Não informado</p>}{lot.peak_career ? <p><b>Melhor fase:</b> {lot.peak_career}{lot.peak_season ? ` • ${lot.peak_season}` : ""}</p> : <p><b>Melhor fase:</b> Não informada</p>}</div>}</div>{lot ? <div className="player-photo">{playerPhoto ? <img src={playerPhoto} alt={lot.player_name} /> : <div className="player-placeholder"><Trophy size={30}/><span>{lot.player_name.slice(0,1)}</span></div>}</div> : <div className="hammer"><Gavel/></div>}</div>
           {lot ? <>
             <div className="price">{money(lot.current_bid || lot.starting_bid)}</div>
             <div className="muted">Maior lance público</div>
